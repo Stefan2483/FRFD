@@ -56,6 +56,7 @@ Anomaly detection
 
 Feature Set
 1. HUD Display Interface
+```
 ┌─────────────────┐
 │ CSIRT TOOLKIT   │
 │ =============== │
@@ -65,7 +66,7 @@ Feature Set
 │ Artifacts: 47%  │
 │ Time: 02:34     │
 └─────────────────┘
-
+```
 Display Information:
 
 Current operation mode
@@ -78,6 +79,7 @@ Memory usage
 
 2. Automated Forensics Toolkit
 Windows Artifacts Collection
+```
 /forensics_tools/windows/
 ├── memory/
 │   ├── process_dump.ps1
@@ -99,8 +101,9 @@ Windows Artifacts Collection
     ├── scheduled_tasks.ps1
     ├── services.ps1
     └── wmi_consumers.ps1
-   
+```   
 Linux Artifacts Collection
+```
 /forensics_tools/linux/
 ├── system/
 │   ├── proc_dump.sh
@@ -118,7 +121,7 @@ Linux Artifacts Collection
     ├── crontab.sh
     ├── systemd.sh
     └── bashrc.sh
-
+```
 3. Communication & Exfiltration
 Secure Data Transfer
 
@@ -128,6 +131,7 @@ Serial Console: Fallback communication via USB serial
 Cloud Upload: Direct upload to CSIRT infrastructure
 
 Evidence Chain of Custody
+```
 {
   "case_id": "INC-2024-0847",
   "responder": "john.doe",
@@ -143,7 +147,7 @@ Evidence Chain of Custody
     }
   ]
 }
-
+```
 4. CSIRT Tool Integration
 A. Volatility Framework Integration
 
@@ -263,23 +267,28 @@ Isolation: Network segmentation capabilities
 
 User Interface Flow
 1. Initial Connection
+```
   [USB Inserted] → [OS Detection] → [Mode Selection]
                                           ↓
                             [Triage] [Collect] [Contain]
-2. Operation Workflow
+```
+3. Operation Workflow
+```
    [Mode Selected] → [Script Execution] → [Progress Display]
         ↓                                      ↓
 [Configuration]                      [Real-time Updates]
         ↓                                      ↓
 [Confirmation]                         [Completion Alert]
-
- 3. Data Extraction
+```
+ 5. Data Extraction
+```
  [Collection Complete] → [Encryption] → [Transfer Method]
                                               ↓
                         [WiFi] [Serial] [SD Card] [Cloud]
-
+```
 Configuration Management
 config.json Structure
+```
 {
   "device_config": {
     "device_id": "FRFD-001",
@@ -305,9 +314,10 @@ config.json Structure
     "evidence_server": "https://evidence.company.com"
   }
 }
-
+```
 Deployment Scripts
 1. Windows PowerShell Launcher
+```
   # FRFD Launcher Script
 $mode = "triage"
 $outputPath = "C:\CSIRT\Evidence\"
@@ -327,12 +337,12 @@ switch ($mode) {
         Invoke-ContainmentProcedure 
     }
 }
-
 # Send results back to dongle
 Send-ResultsToDevice -Path $outputPath
-
+```
 2. Linux Bash Launcher
-   #!/bin/bash
+```
+#!/bin/bash
 # FRFD Linux Launcher
 
 MODE="triage"
@@ -356,7 +366,7 @@ esac
 
 # Transfer results
 transfer_to_device "$OUTPUT_DIR"
-
+```
 Web Interface (Management Portal)
 Features:
 
