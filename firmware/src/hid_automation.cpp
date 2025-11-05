@@ -39,7 +39,9 @@ HIDAutomation::HIDAutomation()
       verbose(true),
       action_sequence_number(0),
       automation_start_time(0),
-      automation_end_time(0) {
+      automation_end_time(0),
+      continue_on_error(true),
+      default_max_retries(3) {
 
     last_detection.detected_os = OperatingSystem::OS_UNKNOWN;
     last_detection.confidence_score = 0;
@@ -1078,6 +1080,155 @@ void HIDAutomation::setError(const String& error) {
     if (verbose) {
         Serial.println("[HID ERROR] " + error);
     }
+}
+
+// ============================================================================
+// ENHANCED ERROR HANDLING
+// ============================================================================
+
+ModuleResult HIDAutomation::executeModuleWithRetry(
+    const String& module_name,
+    std::function<bool()> module_func,
+    uint8_t max_retries,
+    bool continue_on_error_flag
+) {
+    ModuleResult result;
+    result.module_name = module_name;
+    result.success = false;
+    result.error_code = ERROR_NONE;
+    result.retry_count = 0;
+    result.artifacts_collected = 0;
+    result.timestamp = millis();
+
+    unsigned long start_time = millis();
+
+    if (verbose) {
+        Serial.printf("[HID] Executing module: %s\n", module_name.c_str());
+    }
+
+    // Try executing the module with retries
+    for (uint8_t attempt = 0; attempt <= max_retries; attempt++) {
+        if (attempt > 0) {
+            result.retry_count = attempt;
+
+            // Exponential backoff: 2^attempt seconds (2s, 4s, 8s)
+            unsigned long backoff_ms = (1 << attempt) * 1000;
+
+            if (verbose) {
+                Serial.printf("[HID] Retry attempt %d/%d for %s (backoff: %lu ms)\n",
+                             attempt, max_retries, module_name.c_str(), backoff_ms);
+            }
+
+            logAction("MODULE_RETRY",
+                     module_name + " - Attempt " + String(attempt + 1),
+                     "Retrying after failure");
+
+            delay(backoff_ms);
+        }
+
+        // Execute the module function
+        try {
+            result.success = module_func();
+
+            if (result.success) {
+                result.error_code = ERROR_NONE;
+                result.error_message = "";
+
+                if (verbose) {
+                    Serial.printf("[HID] Module %s completed successfully\n", module_name.c_str());
+                }
+
+                logAction("MODULE_SUCCESS", module_name, "Completed on attempt " + String(attempt + 1));
+                break;  // Success, exit retry loop
+            } else {
+                // Module returned false
+                result.error_code = ERROR_COMMAND_FAILED;
+                result.error_message = "Module returned false";
+
+                if (verbose) {
+                    Serial.printf("[HID] Module %s failed (attempt %d/%d)\n",
+                                 module_name.c_str(), attempt + 1, max_retries + 1);
+                }
+            }
+        } catch (...) {
+            // Catch any exceptions
+            result.error_code = ERROR_UNKNOWN;
+            result.error_message = "Exception during execution";
+
+            if (verbose) {
+                Serial.printf("[HID] Module %s threw exception (attempt %d/%d)\n",
+                             module_name.c_str(), attempt + 1, max_retries + 1);
+            }
+        }
+    }
+
+    result.duration_ms = millis() - start_time;
+
+    // Log final result
+    if (!result.success) {
+        String error_msg = module_name + " failed after " + String(result.retry_count + 1) + " attempts";
+        setError(error_msg);
+
+        logAction("MODULE_FAILED",
+                 module_name,
+                 error_msg + " - Error code: " + String(result.error_code));
+
+        // Check if we should continue or stop
+        if (!continue_on_error_flag) {
+            if (verbose) {
+                Serial.printf("[HID] Stopping automation due to module failure (continue_on_error=false)\n");
+            }
+        }
+    }
+
+    // Store result in history
+    logModuleResult(result);
+
+    return result;
+}
+
+void HIDAutomation::logModuleResult(const ModuleResult& result) {
+    module_results.push_back(result);
+
+    // Log to forensic action log as well
+    String status = result.success ? "SUCCESS" : "FAILED";
+    String details = "Duration: " + String(result.duration_ms) + "ms, " +
+                    "Retries: " + String(result.retry_count);
+
+    if (!result.success) {
+        details += ", Error: " + result.error_message +
+                  " (Code: " + String(result.error_code) + ")";
+    }
+
+    logAction("MODULE_RESULT", result.module_name + " - " + status, details);
+}
+
+ErrorSummary HIDAutomation::getErrorSummary() const {
+    ErrorSummary summary;
+    summary.total_modules = module_results.size();
+    summary.successful_modules = 0;
+    summary.failed_modules = 0;
+    summary.retried_modules = 0;
+
+    for (const auto& result : module_results) {
+        if (result.success) {
+            summary.successful_modules++;
+        } else {
+            summary.failed_modules++;
+            summary.failures.push_back(result);
+        }
+
+        if (result.retry_count > 0) {
+            summary.retried_modules++;
+        }
+    }
+
+    return summary;
+}
+
+void HIDAutomation::clearErrorHistory() {
+    module_results.clear();
+    last_error = "";
 }
 
 void HIDAutomation::initializeSequences() {

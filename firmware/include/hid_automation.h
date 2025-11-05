@@ -3,11 +3,34 @@
 
 #include <Arduino.h>
 #include <vector>
+#include <functional>
 #include "Adafruit_TinyUSB.h"
 #include "config.h"
 
 // Forward declarations
 class FRFDStorage;
+
+/**
+ * @brief Error Codes for Module Execution
+ */
+enum ModuleErrorCode : uint16_t {
+    ERROR_NONE = 0,
+    ERROR_COMMAND_FAILED = 100,
+    ERROR_TIMEOUT = 101,
+    ERROR_PERMISSION_DENIED = 102,
+    ERROR_FILE_NOT_FOUND = 103,
+    ERROR_NETWORK_ERROR = 104,
+    ERROR_DISK_FULL = 105,
+    ERROR_INVALID_PATH = 106,
+    ERROR_PROCESS_NOT_FOUND = 107,
+    ERROR_REGISTRY_ACCESS_DENIED = 108,
+    ERROR_SERVICE_NOT_FOUND = 109,
+    ERROR_WIFI_CONNECTION_FAILED = 200,
+    ERROR_UPLOAD_FAILED = 201,
+    ERROR_COMPRESSION_FAILED = 202,
+    ERROR_HASH_VERIFICATION_FAILED = 203,
+    ERROR_UNKNOWN = 999
+};
 
 /**
  * @brief Forensic Action Log Entry
@@ -48,6 +71,33 @@ struct OSDetectionResult {
     bool is_admin;
     String detection_method;
     int confidence_score;        // 0-100
+};
+
+/**
+ * @brief Module Execution Result
+ * Tracks success/failure of individual forensic modules
+ */
+struct ModuleResult {
+    String module_name;           // Name of the module
+    bool success;                 // Overall success flag
+    String error_message;         // Detailed error message if failed
+    uint16_t error_code;          // Error code for categorization
+    uint8_t retry_count;          // Number of retry attempts
+    unsigned long duration_ms;    // Execution duration
+    unsigned long timestamp;      // When module executed
+    size_t artifacts_collected;   // Number of artifacts collected
+};
+
+/**
+ * @brief Error Summary
+ * Aggregated error information for reporting
+ */
+struct ErrorSummary {
+    uint16_t total_modules;
+    uint16_t successful_modules;
+    uint16_t failed_modules;
+    uint16_t retried_modules;
+    std::vector<ModuleResult> failures;
 };
 
 /**
@@ -138,11 +188,25 @@ public:
     bool isHIDReady();
     void setVerbose(bool verbose);
 
+    // Error Handling (Enhanced)
+    ModuleResult executeModuleWithRetry(
+        const String& module_name,
+        std::function<bool()> module_func,
+        uint8_t max_retries = 3,
+        bool continue_on_error = true
+    );
+    void logModuleResult(const ModuleResult& result);
+    ErrorSummary getErrorSummary() const;
+    void clearErrorHistory();
+    bool hasErrors() const { return !module_results.empty() && module_results.back().success == false; }
+    String getLastError() const { return last_error; }
+
     // Getters
     const std::vector<ForensicActionLog>& getActionLog() const { return action_log; }
     int getActionCount() const { return action_log.size(); }
     OSDetectionResult getLastDetection() const { return last_detection; }
     bool isAutomationRunning() const { return automation_running; }
+    const std::vector<ModuleResult>& getModuleResults() const { return module_results; }
 
 private:
     // USB HID
@@ -164,6 +228,11 @@ private:
     std::vector<ForensicActionLog> action_log;
     unsigned long automation_start_time;
     unsigned long automation_end_time;
+
+    // Error Tracking
+    std::vector<ModuleResult> module_results;
+    bool continue_on_error;
+    uint8_t default_max_retries;
 
     // OS Detection Helpers
     bool detectWindowsVersion(String& version);
