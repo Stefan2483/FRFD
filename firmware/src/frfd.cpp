@@ -7,6 +7,7 @@ FRFD::FRFD() {
     display = new FRFDDisplay();
     storage = new FRFDStorage();
     hid_automation = new HIDAutomation();
+    evidence_container = nullptr;  // Created per case
     state.mode = MODE_IDLE;
     state.os = OS_UNKNOWN;
     state.risk = RISK_UNKNOWN;
@@ -24,6 +25,9 @@ FRFD::~FRFD() {
     delete display;
     delete storage;
     delete hid_automation;
+    if (evidence_container) {
+        delete evidence_container;
+    }
 }
 
 bool FRFD::begin() {
@@ -670,6 +674,31 @@ bool FRFD::automateForensicsCollection() {
         setCaseId(autoCase);
     }
 
+    // Create evidence container
+    if (evidence_container) {
+        delete evidence_container;
+    }
+
+    evidence_container = new EvidenceContainer(storage);
+
+    if (!evidence_container->createContainer(state.caseId, state.responder)) {
+        Serial.println("Failed to create evidence container");
+        display->showHIDError("Container Failed");
+        delete evidence_container;
+        evidence_container = nullptr;
+        return false;
+    }
+
+    // Set target system information
+    TargetSystemInfo targetInfo;
+    targetInfo.os_name = display->getOSString(state.os);
+    targetInfo.os_version = ""; // Would be populated from detection
+    targetInfo.hostname = "";  // Would be populated from detection
+    targetInfo.system_time = millis();
+    targetInfo.is_admin = false; // Would be detected
+
+    evidence_container->setTargetSystemInfo(targetInfo);
+
     // Track automation start time
     automation_start_time = millis();
 
@@ -702,13 +731,29 @@ bool FRFD::automateForensicsCollection() {
     if (success) {
         Serial.println("Automated collection completed");
 
-        // Update artifact count
-        state.artifactCount = hid_automation->getActionCount();
+        // Finalize evidence container
+        evidence_container->finalizeContainer();
 
-        // Generate chain of custody
+        // Update artifact count from container
+        state.artifactCount = evidence_container->getArtifactCount();
+        state.totalSize = evidence_container->getTotalSize();
+
+        // Print statistics
+        Serial.printf("Collection Stats:\n");
+        Serial.printf("  Artifacts: %d\n", state.artifactCount);
+        Serial.printf("  Total Size: %d bytes\n", state.totalSize);
+        Serial.printf("  Compressed: %d bytes\n", evidence_container->getCompressedSize());
+        Serial.printf("  Ratio: %.2f%%\n", evidence_container->getCompressionRatio() * 100.0);
+        Serial.printf("  Duration: %lu ms\n", evidence_container->getCollectionDuration());
+
+        // Generate chain of custody (old method for compatibility)
         generateChainOfCustody();
     } else {
         Serial.println("Automated collection encountered errors");
+
+        if (evidence_container) {
+            evidence_container->finalizeContainer(); // Finalize even on error
+        }
     }
 
     return success;
@@ -716,6 +761,7 @@ bool FRFD::automateForensicsCollection() {
 
 bool FRFD::automateWindowsWithDisplay(uint8_t totalModules) {
     const char* modules[] = {"Memory", "Autoruns", "Network", "EventLogs", "Prefetch", "Tasks", "Services"};
+    const char* types[] = {"memory", "registry", "network", "logs", "filesystem", "persistence", "persistence"};
 
     for (uint8_t i = 0; i < totalModules; i++) {
         // Show current module
@@ -725,6 +771,28 @@ bool FRFD::automateWindowsWithDisplay(uint8_t totalModules) {
         for (uint8_t progress = 0; progress <= 100; progress += 25) {
             display->showHIDProgress(i + 1, totalModules, String(modules[i]), progress);
             delay(500); // Simulated work time
+        }
+
+        // Create simulated artifact (in real implementation, this would be actual collected data)
+        String artifactName = String(modules[i]) + "_" + String(millis()) + ".dat";
+        String artifactData = "Simulated artifact data from " + String(modules[i]) + " module\n";
+        artifactData += "Collected at: " + String(millis()) + " ms\n";
+        artifactData += "Module type: " + String(types[i]) + "\n";
+
+        // Add to evidence container
+        if (evidence_container) {
+            String artifactId = evidence_container->addArtifact(
+                types[i],
+                artifactName,
+                (const uint8_t*)artifactData.c_str(),
+                artifactData.length(),
+                true  // Enable compression
+            );
+
+            if (artifactId.length() > 0) {
+                Serial.printf("[Collection] Added artifact: %s (%d bytes)\n",
+                             artifactName.c_str(), artifactData.length());
+            }
         }
 
         // Log action
@@ -736,6 +804,7 @@ bool FRFD::automateWindowsWithDisplay(uint8_t totalModules) {
 
 bool FRFD::automateLinuxWithDisplay(uint8_t totalModules) {
     const char* modules[] = {"SysInfo", "AuthLogs", "Network", "Kernel", "Persist"};
+    const char* types[] = {"filesystem", "logs", "network", "filesystem", "persistence"};
 
     for (uint8_t i = 0; i < totalModules; i++) {
         // Show current module
@@ -747,6 +816,22 @@ bool FRFD::automateLinuxWithDisplay(uint8_t totalModules) {
             delay(500); // Simulated work time
         }
 
+        // Create simulated artifact
+        String artifactName = String(modules[i]) + "_" + String(millis()) + ".dat";
+        String artifactData = "Simulated Linux artifact from " + String(modules[i]) + "\n";
+        artifactData += "Timestamp: " + String(millis()) + "\n";
+
+        // Add to evidence container
+        if (evidence_container) {
+            evidence_container->addArtifact(
+                types[i],
+                artifactName,
+                (const uint8_t*)artifactData.c_str(),
+                artifactData.length(),
+                true
+            );
+        }
+
         // Log action
         hid_automation->logAction("LNX_MODULE", modules[i], "SUCCESS");
     }
@@ -756,6 +841,7 @@ bool FRFD::automateLinuxWithDisplay(uint8_t totalModules) {
 
 bool FRFD::automateMacOSWithDisplay(uint8_t totalModules) {
     const char* modules[] = {"SysInfo", "Persist"};
+    const char* types[] = {"filesystem", "persistence"};
 
     for (uint8_t i = 0; i < totalModules; i++) {
         // Show current module
@@ -765,6 +851,22 @@ bool FRFD::automateMacOSWithDisplay(uint8_t totalModules) {
         for (uint8_t progress = 0; progress <= 100; progress += 25) {
             display->showHIDProgress(i + 1, totalModules, String(modules[i]), progress);
             delay(500); // Simulated work time
+        }
+
+        // Create simulated artifact
+        String artifactName = String(modules[i]) + "_" + String(millis()) + ".dat";
+        String artifactData = "Simulated macOS artifact from " + String(modules[i]) + "\n";
+        artifactData += "Timestamp: " + String(millis()) + "\n";
+
+        // Add to evidence container
+        if (evidence_container) {
+            evidence_container->addArtifact(
+                types[i],
+                artifactName,
+                (const uint8_t*)artifactData.c_str(),
+                artifactData.length(),
+                true
+            );
         }
 
         // Log action

@@ -184,6 +184,55 @@ bool FRFDStorage::createSubDirectory(const String& subDir) {
     return SD.mkdir(fullPath.c_str());
 }
 
+bool FRFDStorage::createDirectory(const String& path) {
+    if (!sdCardAvailable) {
+        Serial.println("[Storage] SD Card not available");
+        return false;
+    }
+
+    // Check if directory already exists
+    if (SD.exists(path.c_str())) {
+        return true;
+    }
+
+    // Create parent directories if needed
+    String currentPath = "";
+    int start = (path.startsWith("/")) ? 1 : 0;
+    int nextSlash = path.indexOf('/', start);
+
+    while (nextSlash != -1) {
+        currentPath = path.substring(0, nextSlash);
+
+        if (!SD.exists(currentPath.c_str())) {
+            if (!SD.mkdir(currentPath.c_str())) {
+                Serial.printf("[Storage] Failed to create directory: %s\n", currentPath.c_str());
+                return false;
+            }
+        }
+
+        start = nextSlash + 1;
+        nextSlash = path.indexOf('/', start);
+    }
+
+    // Create final directory
+    if (!SD.exists(path.c_str())) {
+        if (!SD.mkdir(path.c_str())) {
+            Serial.printf("[Storage] Failed to create final directory: %s\n", path.c_str());
+            return false;
+        }
+    }
+
+    return true;
+}
+
+bool FRFDStorage::directoryExists(const String& path) {
+    if (!sdCardAvailable) {
+        return false;
+    }
+
+    return SD.exists(path.c_str());
+}
+
 bool FRFDStorage::writeFile(const String& path, const String& data) {
     return writeFile(path, (const uint8_t*)data.c_str(), data.length());
 }

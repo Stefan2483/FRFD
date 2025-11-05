@@ -36,8 +36,10 @@ public:
 
     // Directory management
     bool createCaseDirectory(const String& caseId);
+    bool createDirectory(const String& path);
     String getCaseDirectory();
     bool createSubDirectory(const String& subDir);
+    bool directoryExists(const String& path);
 
     // File operations
     bool writeFile(const String& path, const String& data);
