@@ -116,6 +116,15 @@ public:
     // Helper methods for HID display
     String getHIDPhaseString(HIDPhase phase);
     String getPhaseTimeString();
+
+    // Enhanced Module Tracking (Phase 8.0+)
+    void showModuleStart(const String& moduleName, uint8_t moduleNum, uint8_t totalModules);
+    void showModuleProgress(const String& moduleName, uint8_t progressPercent);
+    void showModuleComplete(const String& moduleName, bool success, unsigned long durationMs);
+    void showModuleList(const std::vector<String>& modules, const std::vector<bool>& completed);
+    void showLiveStats(uint8_t modulesCompleted, uint8_t modulesTotal, unsigned long elapsedMs, uint8_t artifactsCollected);
+    void drawCompactProgressBar(uint8_t y, uint8_t percent, const String& label);
+    void drawModuleStatus(uint8_t y, const String& moduleName, const String& status, uint16_t statusColor);
 };
 
 #endif // DISPLAY_H
