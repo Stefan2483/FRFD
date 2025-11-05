@@ -82,6 +82,10 @@ bool WiFiManager::startAP() {
 
     // Setup routes
     server->on("/", HTTP_GET, [this]() { handleRoot(); });
+    server->on("/dashboard", HTTP_GET, [this]() { handleDashboard(); });
+    server->on("/logs", HTTP_GET, [this]() { handleLogs(); });
+    server->on("/api/modules", HTTP_GET, [this]() { handleModules(); });
+    server->on("/api/control", HTTP_POST, [this]() { handleControl(); });
     server->on("/status", HTTP_GET, [this]() { handleStatus(); });
     server->on("/files", HTTP_GET, [this]() { handleFiles(); });
     server->on("/download", HTTP_GET, [this]() { handleDownload(); });
@@ -135,6 +139,76 @@ void WiFiManager::setStatus(const String& status) {
 
 void WiFiManager::setProgress(uint8_t progress) {
     currentProgress = progress;
+}
+
+// Module status tracking
+void WiFiManager::addModule(const String& module_name) {
+    ModuleStatus status;
+    status.name = module_name;
+    status.status = "pending";
+    status.progress = 0;
+    status.start_time = 0;
+    status.duration_ms = 0;
+    status.error_message = "";
+    module_statuses.push_back(status);
+}
+
+void WiFiManager::updateModuleStatus(const String& module_name, const String& status, uint8_t progress) {
+    for (auto& mod : module_statuses) {
+        if (mod.name == module_name) {
+            mod.status = status;
+            mod.progress = progress;
+
+            if (status == "running" && mod.start_time == 0) {
+                mod.start_time = millis();
+            } else if (status == "completed" || status == "failed") {
+                if (mod.start_time > 0) {
+                    mod.duration_ms = millis() - mod.start_time;
+                }
+            }
+            break;
+        }
+    }
+}
+
+void WiFiManager::setModuleError(const String& module_name, const String& error) {
+    for (auto& mod : module_statuses) {
+        if (mod.name == module_name) {
+            mod.status = "failed";
+            mod.error_message = error;
+            if (mod.start_time > 0) {
+                mod.duration_ms = millis() - mod.start_time;
+            }
+            break;
+        }
+    }
+}
+
+void WiFiManager::clearModules() {
+    module_statuses.clear();
+}
+
+// Log management
+void WiFiManager::addLog(const String& log_entry) {
+    // Add timestamp
+    String timestamped_log = "[" + String(millis() / 1000) + "s] " + log_entry;
+    recent_logs.push_back(timestamped_log);
+
+    // Keep only last max_log_entries
+    if (recent_logs.size() > max_log_entries) {
+        recent_logs.erase(recent_logs.begin());
+    }
+}
+
+String WiFiManager::getRecentLogs(size_t count) {
+    String logs = "";
+    size_t start = recent_logs.size() > count ? recent_logs.size() - count : 0;
+
+    for (size_t i = start; i < recent_logs.size(); i++) {
+        logs += recent_logs[i] + "\n";
+    }
+
+    return logs;
 }
 
 void WiFiManager::setEvidenceContainer(EvidenceContainer* container) {
@@ -291,6 +365,9 @@ void WiFiManager::handleRoot() {
         </div>
 
         <div class="menu">
+            <a href="/dashboard" class="menu-item">
+                🎛️ Real-Time Dashboard
+            </a>
             <a href="/files" class="menu-item">
                 📁 Browse Files
             </a>
@@ -311,6 +388,195 @@ void WiFiManager::handleRoot() {
 )";
 
     server->send(200, "text/html", html);
+}
+
+void WiFiManager::handleDashboard() {
+    String html = R"(<!DOCTYPE html>
+<html>
+<head>
+    <title>FRFD Dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Arial, sans-serif; background: #1a1a2e; color: #eee; padding: 20px; }
+        .container { max-width: 1400px; margin: 0 auto; }
+        h1 { color: #16c79a; margin-bottom: 20px; text-align: center; }
+        .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+        .card { background: #0f3460; border-radius: 10px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
+        .card h2 { color: #16c79a; font-size: 1.2em; margin-bottom: 15px; border-bottom: 2px solid #16c79a; padding-bottom: 10px; }
+        .stat { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #1a1a2e; }
+        .stat-label { font-weight: bold; color: #aaa; }
+        .stat-value { color: #16c79a; font-weight: bold; }
+        .module { background: #1a1a2e; padding: 10px; margin: 8px 0; border-radius: 5px; border-left: 4px solid #16c79a; }
+        .module-name { font-weight: bold; color: #16c79a; }
+        .module-status { float: right; padding: 3px 10px; border-radius: 3px; font-size: 0.9em; }
+        .status-pending { background: #666; }
+        .status-running { background: #f39c12; animation: pulse 1.5s infinite; }
+        .status-completed { background: #27ae60; }
+        .status-failed { background: #e74c3c; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+        .progress-bar { background: #1a1a2e; height: 20px; border-radius: 10px; overflow: hidden; margin: 10px 0; }
+        .progress-fill { background: linear-gradient(90deg, #16c79a, #11998e); height: 100%; transition: width 0.3s; text-align: center; color: white; font-size: 0.8em; line-height: 20px; }
+        .log-viewer { background: #000; color: #0f0; padding: 15px; border-radius: 5px; font-family: 'Courier New', monospace; font-size: 0.85em; max-height: 400px; overflow-y: auto; }
+        .log-entry { margin: 3px 0; }
+        .refresh-btn { background: #16c79a; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; margin: 10px 0; }
+        .refresh-btn:hover { background: #11998e; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 FRFD Real-Time Dashboard</h1>
+
+        <div class="grid">
+            <div class="card">
+                <h2>System Status</h2>
+                <div class="stat"><span class="stat-label">Device:</span><span class="stat-value" id="device-id">)</span>" + deviceId + R"(</span></div>
+                <div class="stat"><span class="stat-label">Firmware:</span><span class="stat-value">)" + String(FIRMWARE_VERSION) + R"(</span></div>
+                <div class="stat"><span class="stat-label">Mode:</span><span class="stat-value" id="mode">)</span>" + currentMode + R"(</span></div>
+                <div class="stat"><span class="stat-label">Status:</span><span class="stat-value" id="status">)</span>" + currentStatus + R"(</span></div>
+                <div class="stat"><span class="stat-label">Clients:</span><span class="stat-value" id="clients">)</span>" + String(getConnectedClients()) + R"(</span></div>
+                <div class="stat"><span class="stat-label">Uptime:</span><span class="stat-value" id="uptime">0s</span></div>
+            </div>
+
+            <div class="card">
+                <h2>Storage</h2>
+                <div class="stat"><span class="stat-label">SD Card:</span><span class="stat-value" id="sd-status">Checking...</span></div>
+                <div class="stat"><span class="stat-label">Size:</span><span class="stat-value" id="sd-size">-</span></div>
+                <div class="stat"><span class="stat-label">Free:</span><span class="stat-value" id="sd-free">-</span></div>
+                <div class="stat"><span class="stat-label">Used:</span><span class="stat-value" id="sd-used">-</span></div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="sd-progress" style="width: 0%">0%</div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>Upload Status</h2>
+                <div class="stat"><span class="stat-label">Active:</span><span class="stat-value" id="upload-active">No</span></div>
+                <div class="stat"><span class="stat-label">File:</span><span class="stat-value" id="upload-file">-</span></div>
+                <div class="stat"><span class="stat-label">Speed:</span><span class="stat-value" id="upload-speed">-</span></div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="upload-progress" style="width: 0%">0%</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card" style="margin-top: 20px;">
+            <h2>Module Execution</h2>
+            <div id="modules-container">Loading modules...</div>
+        </div>
+
+        <div class="card" style="margin-top: 20px;">
+            <h2>Live Logs</h2>
+            <div class="log-viewer" id="logs-container">Loading logs...</div>
+        </div>
+    </div>
+
+    <script>
+        function updateDashboard() {
+            fetch('/status').then(r => r.json()).then(data => {
+                document.getElementById('mode').textContent = data.mode;
+                document.getElementById('status').textContent = data.status;
+                document.getElementById('clients').textContent = data.connected_clients;
+                document.getElementById('uptime').textContent = data.uptime + 's';
+
+                if (data.sd_card) {
+                    document.getElementById('sd-status').textContent = 'Connected';
+                    document.getElementById('sd-size').textContent = data.sd_size_mb + ' MB';
+                    document.getElementById('sd-free').textContent = data.sd_free_mb + ' MB';
+                    const used = data.sd_size_mb - data.sd_free_mb;
+                    const usedPercent = (used / data.sd_size_mb * 100).toFixed(1);
+                    document.getElementById('sd-used').textContent = used.toFixed(1) + ' MB';
+                    document.getElementById('sd-progress').style.width = usedPercent + '%';
+                    document.getElementById('sd-progress').textContent = usedPercent + '%';
+                }
+
+                if (data.upload && data.upload.active) {
+                    document.getElementById('upload-active').textContent = 'Yes';
+                    document.getElementById('upload-file').textContent = data.upload.filename || '-';
+                    document.getElementById('upload-speed').textContent = (data.upload.speed_kbps || 0).toFixed(1) + ' KB/s';
+                    document.getElementById('upload-progress').style.width = (data.upload.percent || 0) + '%';
+                    document.getElementById('upload-progress').textContent = (data.upload.percent || 0) + '%';
+                } else {
+                    document.getElementById('upload-active').textContent = 'No';
+                    document.getElementById('upload-file').textContent = '-';
+                    document.getElementById('upload-speed').textContent = '-';
+                    document.getElementById('upload-progress').style.width = '0%';
+                    document.getElementById('upload-progress').textContent = '0%';
+                }
+            });
+
+            fetch('/api/modules').then(r => r.json()).then(data => {
+                let html = '';
+                data.modules.forEach(m => {
+                    html += `<div class="module">
+                        <span class="module-name">${m.name}</span>
+                        <span class="module-status status-${m.status}">${m.status.toUpperCase()}</span>
+                        <div style="clear:both;"></div>
+                        ${m.progress > 0 ? `<div class="progress-bar"><div class="progress-fill" style="width:${m.progress}%">${m.progress}%</div></div>` : ''}
+                        ${m.error ? `<div style="color:#e74c3c;margin-top:5px;">Error: ${m.error}</div>` : ''}
+                        ${m.duration_ms > 0 ? `<div style="color:#aaa;font-size:0.85em;margin-top:5px;">Duration: ${(m.duration_ms/1000).toFixed(1)}s</div>` : ''}
+                    </div>`;
+                });
+                document.getElementById('modules-container').innerHTML = html || 'No modules running';
+            });
+
+            fetch('/logs?count=20').then(r => r.text()).then(logs => {
+                const logLines = logs.split('\n').filter(l => l.trim()).map(l =>
+                    `<div class="log-entry">${l}</div>`
+                ).join('');
+                const container = document.getElementById('logs-container');
+                container.innerHTML = logLines || 'No logs available';
+                container.scrollTop = container.scrollHeight;
+            });
+        }
+
+        setInterval(updateDashboard, 1000);
+        updateDashboard();
+    </script>
+</body>
+</html>)";
+    server->send(200, "text/html", html);
+}
+
+void WiFiManager::handleLogs() {
+    size_t count = 50;
+    if (server->hasArg("count")) {
+        count = server->arg("count").toInt();
+    }
+
+    String logs = getRecentLogs(count);
+    server->send(200, "text/plain", logs);
+}
+
+void WiFiManager::handleModules() {
+    String json = "{\"modules\":[";
+
+    for (size_t i = 0; i < module_statuses.size(); i++) {
+        if (i > 0) json += ",";
+
+        json += "{";
+        json += "\"name\":\"" + module_statuses[i].name + "\",";
+        json += "\"status\":\"" + module_statuses[i].status + "\",";
+        json += "\"progress\":" + String(module_statuses[i].progress) + ",";
+        json += "\"duration_ms\":" + String(module_statuses[i].duration_ms);
+
+        if (module_statuses[i].error_message.length() > 0) {
+            json += ",\"error\":\"" + module_statuses[i].error_message + "\"";
+        }
+
+        json += "}";
+    }
+
+    json += "]}";
+    server->send(200, "application/json", json);
+}
+
+void WiFiManager::handleControl() {
+    // Placeholder for future control commands (pause/resume/abort)
+    String action = server->hasArg("action") ? server->arg("action") : "";
+
+    String response = "{\"status\":\"received\",\"action\":\"" + action + "\",\"message\":\"Control commands not yet implemented\"}";
+    server->send(200, "application/json", response);
 }
 
 void WiFiManager::handleStatus() {

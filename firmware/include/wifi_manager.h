@@ -26,6 +26,21 @@ private:
     String currentStatus;
     uint8_t currentProgress;
 
+    // Module execution tracking
+    struct ModuleStatus {
+        String name;
+        String status;  // "pending", "running", "completed", "failed"
+        uint8_t progress;
+        unsigned long start_time;
+        unsigned long duration_ms;
+        String error_message;
+    };
+    std::vector<ModuleStatus> module_statuses;
+
+    // Forensic log buffer for web display
+    std::vector<String> recent_logs;
+    const size_t max_log_entries = 100;
+
     // Upload progress tracking
     struct UploadProgress {
         bool active;
@@ -40,6 +55,10 @@ private:
 
     // Web handlers
     void handleRoot();
+    void handleDashboard();
+    void handleLogs();
+    void handleModules();
+    void handleControl();
     void handleStatus();
     void handleFiles();
     void handleDownload();
@@ -70,6 +89,16 @@ public:
     void setMode(const String& mode);
     void setStatus(const String& status);
     void setProgress(uint8_t progress);
+
+    // Module status tracking
+    void addModule(const String& module_name);
+    void updateModuleStatus(const String& module_name, const String& status, uint8_t progress = 0);
+    void setModuleError(const String& module_name, const String& error);
+    void clearModules();
+
+    // Log management
+    void addLog(const String& log_entry);
+    String getRecentLogs(size_t count = 50);
 
     // Evidence container integration
     void setEvidenceContainer(EvidenceContainer* container);
