@@ -94,6 +94,9 @@ bool WiFiManager::startAP() {
         [this]() { server->send(200, "application/json", "{\"status\":\"success\"}"); },
         [this]() { handleUpload(); }
     );
+    server->on("/export/logs", HTTP_GET, [this]() { handleExportLogs(); });
+    server->on("/export/modules", HTTP_GET, [this]() { handleExportModules(); });
+    server->on("/export/report", HTTP_GET, [this]() { handleExportReport(); });
     server->onNotFound([this]() { handleNotFound(); });
 
     server->begin();
@@ -209,6 +212,204 @@ String WiFiManager::getRecentLogs(size_t count) {
     }
 
     return logs;
+}
+
+// Export functionality
+String WiFiManager::exportLogsJSON() {
+    String json = "{";
+    json += "\"device_id\":\"" + deviceId + "\",";
+    json += "\"timestamp\":" + String(millis()) + ",";
+    json += "\"log_count\":" + String(recent_logs.size()) + ",";
+    json += "\"logs\":[";
+
+    for (size_t i = 0; i < recent_logs.size(); i++) {
+        if (i > 0) json += ",";
+
+        // Escape quotes in log entries
+        String escapedLog = recent_logs[i];
+        escapedLog.replace("\"", "\\\"");
+        escapedLog.replace("\n", "\\n");
+        escapedLog.replace("\r", "\\r");
+
+        json += "{\"index\":" + String(i) + ",\"entry\":\"" + escapedLog + "\"}";
+    }
+
+    json += "],";
+    json += "\"firmware\":\"" + String(FIRMWARE_VERSION) + "\"";
+    json += "}";
+
+    return json;
+}
+
+String WiFiManager::exportLogsCSV() {
+    String csv = "Index,Timestamp,Entry\n";
+
+    for (size_t i = 0; i < recent_logs.size(); i++) {
+        // Escape commas and quotes for CSV
+        String escapedLog = recent_logs[i];
+        escapedLog.replace("\"", "\"\"");
+
+        // Extract timestamp if present
+        String timestamp = "";
+        if (escapedLog.startsWith("[") && escapedLog.indexOf("s]") > 0) {
+            int endBracket = escapedLog.indexOf("s]");
+            timestamp = escapedLog.substring(1, endBracket);
+            escapedLog = escapedLog.substring(endBracket + 3);  // Skip "] "
+        }
+
+        csv += String(i) + ",";
+        csv += timestamp + ",";
+        csv += "\"" + escapedLog + "\"\n";
+    }
+
+    return csv;
+}
+
+String WiFiManager::exportModuleStatusJSON() {
+    String json = "{";
+    json += "\"device_id\":\"" + deviceId + "\",";
+    json += "\"timestamp\":" + String(millis()) + ",";
+    json += "\"total_modules\":" + String(module_statuses.size()) + ",";
+
+    // Count statuses
+    uint8_t pending = 0, running = 0, completed = 0, failed = 0;
+    for (const auto& mod : module_statuses) {
+        if (mod.status == "pending") pending++;
+        else if (mod.status == "running") running++;
+        else if (mod.status == "completed") completed++;
+        else if (mod.status == "failed") failed++;
+    }
+
+    json += "\"summary\":{";
+    json += "\"pending\":" + String(pending) + ",";
+    json += "\"running\":" + String(running) + ",";
+    json += "\"completed\":" + String(completed) + ",";
+    json += "\"failed\":" + String(failed);
+    json += "},";
+
+    json += "\"modules\":[";
+    for (size_t i = 0; i < module_statuses.size(); i++) {
+        if (i > 0) json += ",";
+
+        json += "{";
+        json += "\"name\":\"" + module_statuses[i].name + "\",";
+        json += "\"status\":\"" + module_statuses[i].status + "\",";
+        json += "\"progress\":" + String(module_statuses[i].progress) + ",";
+        json += "\"start_time\":" + String(module_statuses[i].start_time) + ",";
+        json += "\"duration_ms\":" + String(module_statuses[i].duration_ms);
+
+        if (!module_statuses[i].error_message.isEmpty()) {
+            String escapedError = module_statuses[i].error_message;
+            escapedError.replace("\"", "\\\"");
+            json += ",\"error\":\"" + escapedError + "\"";
+        }
+
+        json += "}";
+    }
+    json += "],";
+
+    json += "\"firmware\":\"" + String(FIRMWARE_VERSION) + "\"";
+    json += "}";
+
+    return json;
+}
+
+String WiFiManager::exportModuleStatusCSV() {
+    String csv = "Name,Status,Progress,Start_Time,Duration_MS,Error\n";
+
+    for (const auto& mod : module_statuses) {
+        // Escape commas and quotes for CSV
+        String escapedName = mod.name;
+        escapedName.replace("\"", "\"\"");
+
+        String escapedError = mod.error_message;
+        escapedError.replace("\"", "\"\"");
+
+        csv += "\"" + escapedName + "\",";
+        csv += mod.status + ",";
+        csv += String(mod.progress) + ",";
+        csv += String(mod.start_time) + ",";
+        csv += String(mod.duration_ms) + ",";
+        csv += "\"" + escapedError + "\"\n";
+    }
+
+    return csv;
+}
+
+String WiFiManager::exportFullReportJSON() {
+    String json = "{";
+    json += "\"report_type\":\"FRFD_Forensic_Report\",";
+    json += "\"generated_at\":" + String(millis()) + ",";
+    json += "\"device\":{";
+    json += "\"id\":\"" + deviceId + "\",";
+    json += "\"firmware\":\"" + String(FIRMWARE_VERSION) + "\",";
+    json += "\"mode\":\"" + currentMode + "\",";
+    json += "\"status\":\"" + currentStatus + "\",";
+    json += "\"progress\":" + String(currentProgress) + ",";
+    json += "\"uptime_sec\":" + String(millis() / 1000) + ",";
+    json += "\"ip\":\"" + getAPIP() + "\",";
+    json += "\"ssid\":\"" + getAPSSID() + "\"";
+    json += "},";
+
+    // Storage info
+    json += "\"storage\":{";
+    json += "\"available\":" + String(storage->isSDCardAvailable() ? "true" : "false");
+    if (storage->isSDCardAvailable()) {
+        json += ",\"size_mb\":" + String(storage->getSDCardSize());
+        json += ",\"free_mb\":" + String(storage->getSDCardFree());
+        json += ",\"used_mb\":" + String(storage->getSDCardSize() - storage->getSDCardFree());
+    }
+    json += "},";
+
+    // Module execution summary
+    uint8_t pending = 0, running = 0, completed = 0, failed = 0;
+    for (const auto& mod : module_statuses) {
+        if (mod.status == "pending") pending++;
+        else if (mod.status == "running") running++;
+        else if (mod.status == "completed") completed++;
+        else if (mod.status == "failed") failed++;
+    }
+
+    json += "\"execution_summary\":{";
+    json += "\"total_modules\":" + String(module_statuses.size()) + ",";
+    json += "\"completed\":" + String(completed) + ",";
+    json += "\"failed\":" + String(failed) + ",";
+    json += "\"pending\":" + String(pending) + ",";
+    json += "\"running\":" + String(running) + ",";
+    json += "\"success_rate\":" + String(module_statuses.size() > 0 ? (completed * 100.0 / module_statuses.size()) : 0, 1);
+    json += "},";
+
+    // Recent modules (last 10)
+    json += "\"recent_modules\":[";
+    size_t startIdx = module_statuses.size() > 10 ? module_statuses.size() - 10 : 0;
+    for (size_t i = startIdx; i < module_statuses.size(); i++) {
+        if (i > startIdx) json += ",";
+
+        json += "{";
+        json += "\"name\":\"" + module_statuses[i].name + "\",";
+        json += "\"status\":\"" + module_statuses[i].status + "\",";
+        json += "\"duration_ms\":" + String(module_statuses[i].duration_ms);
+        json += "}";
+    }
+    json += "],";
+
+    // Recent logs (last 20)
+    json += "\"recent_logs\":[";
+    size_t logStart = recent_logs.size() > 20 ? recent_logs.size() - 20 : 0;
+    for (size_t i = logStart; i < recent_logs.size(); i++) {
+        if (i > logStart) json += ",";
+
+        String escapedLog = recent_logs[i];
+        escapedLog.replace("\"", "\\\"");
+        escapedLog.replace("\n", "\\n");
+
+        json += "\"" + escapedLog + "\"";
+    }
+    json += "]";
+
+    json += "}";
+
+    return json;
 }
 
 void WiFiManager::setEvidenceContainer(EvidenceContainer* container) {
@@ -468,6 +669,17 @@ void WiFiManager::handleDashboard() {
         <div class="card" style="margin-top: 20px;">
             <h2>Live Logs</h2>
             <div class="log-viewer" id="logs-container">Loading logs...</div>
+        </div>
+
+        <div class="card" style="margin-top: 20px;">
+            <h2>Export Forensic Data</h2>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-top: 15px;">
+                <a href="/export/logs?format=json" class="refresh-btn" style="text-decoration: none; text-align: center; display: block;">📥 Logs (JSON)</a>
+                <a href="/export/logs?format=csv" class="refresh-btn" style="text-decoration: none; text-align: center; display: block;">📥 Logs (CSV)</a>
+                <a href="/export/modules?format=json" class="refresh-btn" style="text-decoration: none; text-align: center; display: block;">📥 Modules (JSON)</a>
+                <a href="/export/modules?format=csv" class="refresh-btn" style="text-decoration: none; text-align: center; display: block;">📥 Modules (CSV)</a>
+                <a href="/export/report" class="refresh-btn" style="text-decoration: none; text-align: center; display: block;">📥 Full Report</a>
+            </div>
         </div>
     </div>
 
@@ -941,6 +1153,45 @@ void WiFiManager::handleUpload() {
         server->send(500, "application/json",
                     "{\"status\":\"error\",\"message\":\"Upload aborted\"}");
     }
+}
+
+void WiFiManager::handleExportLogs() {
+    String format = server->hasArg("format") ? server->arg("format") : "json";
+
+    if (format == "csv") {
+        String csv = exportLogsCSV();
+        server->sendHeader("Content-Disposition", "attachment; filename=\"frfd_logs.csv\"");
+        server->send(200, "text/csv", csv);
+        Serial.println("[WiFi] Exported logs as CSV");
+    } else {
+        String json = exportLogsJSON();
+        server->sendHeader("Content-Disposition", "attachment; filename=\"frfd_logs.json\"");
+        server->send(200, "application/json", json);
+        Serial.println("[WiFi] Exported logs as JSON");
+    }
+}
+
+void WiFiManager::handleExportModules() {
+    String format = server->hasArg("format") ? server->arg("format") : "json";
+
+    if (format == "csv") {
+        String csv = exportModuleStatusCSV();
+        server->sendHeader("Content-Disposition", "attachment; filename=\"frfd_modules.csv\"");
+        server->send(200, "text/csv", csv);
+        Serial.println("[WiFi] Exported module status as CSV");
+    } else {
+        String json = exportModuleStatusJSON();
+        server->sendHeader("Content-Disposition", "attachment; filename=\"frfd_modules.json\"");
+        server->send(200, "application/json", json);
+        Serial.println("[WiFi] Exported module status as JSON");
+    }
+}
+
+void WiFiManager::handleExportReport() {
+    String json = exportFullReportJSON();
+    server->sendHeader("Content-Disposition", "attachment; filename=\"frfd_report.json\"");
+    server->send(200, "application/json", json);
+    Serial.println("[WiFi] Exported full forensic report");
 }
 
 String WiFiManager::getContentType(String filename) {

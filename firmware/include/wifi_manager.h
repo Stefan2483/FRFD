@@ -64,6 +64,9 @@ private:
     void handleDownload();
     void handleUpload();
     void handleConfig();
+    void handleExportLogs();
+    void handleExportModules();
+    void handleExportReport();
     void handleNotFound();
 
     // Helper functions
@@ -99,6 +102,13 @@ public:
     // Log management
     void addLog(const String& log_entry);
     String getRecentLogs(size_t count = 50);
+
+    // Export functionality
+    String exportLogsJSON();
+    String exportLogsCSV();
+    String exportModuleStatusJSON();
+    String exportModuleStatusCSV();
+    String exportFullReportJSON();
 
     // Evidence container integration
     void setEvidenceContainer(EvidenceContainer* container);
