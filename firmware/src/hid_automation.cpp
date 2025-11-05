@@ -2169,6 +2169,199 @@ bool HIDAutomation::executeMacOSMemoryDump() {
     return true;
 }
 
+bool HIDAutomation::executeMacOSNetworkInterfaces() {
+    logAction("MAC_NETWORK", "Collecting network interfaces and connections", "STARTED");
+
+    typeCommand("mkdir -p network", true);
+    delay(300);
+
+    // Network interfaces
+    typeCommand("ifconfig -a > network/ifconfig.txt 2>&1", true);
+    delay(500);
+    logAction("MAC_NETWORK", "Network interfaces collected", "SUCCESS");
+
+    // Active connections
+    typeCommand("netstat -an > network/netstat_all.txt 2>&1", true);
+    delay(1000);
+
+    typeCommand("lsof -i -n -P > network/lsof_network.txt 2>&1", true);
+    delay(2000);
+
+    // Routing table
+    typeCommand("netstat -rn > network/routing_table.txt 2>&1", true);
+    delay(500);
+
+    // ARP cache
+    typeCommand("arp -an > network/arp_cache.txt 2>&1", true);
+    delay(500);
+
+    // WiFi networks
+    typeCommand("/System/Library/PrivateFrameworks/Apple80211.framework/Versions/Current/Resources/airport -s > network/wifi_scan.txt 2>&1", true);
+    delay(3000);
+
+    typeCommand("/System/Library/PrivateFrameworks/Apple80211.framework/Versions/Current/Resources/airport -I > network/wifi_info.txt 2>&1", true);
+    delay(500);
+
+    // Network preferences
+    typeCommand("sudo cp /Library/Preferences/SystemConfiguration/preferences.plist network/ 2>/dev/null", true);
+    delay(500);
+
+    typeCommand("sudo cp /Library/Preferences/SystemConfiguration/NetworkInterfaces.plist network/ 2>/dev/null", true);
+    delay(500);
+
+    logAction("MAC_NETWORK", "Network collection complete", "SUCCESS");
+    return true;
+}
+
+bool HIDAutomation::executeMacOSLaunchAgents() {
+    logAction("MAC_LAUNCH", "Collecting Launch Agents/Daemons (persistence)", "STARTED");
+
+    typeCommand("mkdir -p launch_items", true);
+    delay(300);
+
+    // User Launch Agents
+    typeCommand("sudo cp -r ~/Library/LaunchAgents launch_items/user_launch_agents 2>/dev/null", true);
+    delay(1000);
+    logAction("MAC_LAUNCH", "User Launch Agents collected", "SUCCESS");
+
+    // System Launch Agents
+    typeCommand("sudo cp -r /Library/LaunchAgents launch_items/system_launch_agents 2>/dev/null", true);
+    delay(1500);
+
+    // System Launch Daemons (root-level)
+    typeCommand("sudo cp -r /Library/LaunchDaemons launch_items/launch_daemons 2>/dev/null", true);
+    delay(1500);
+
+    // Apple's Launch Daemons
+    typeCommand("sudo ls -laR /System/Library/LaunchDaemons > launch_items/apple_launch_daemons.txt 2>&1", true);
+    delay(1000);
+
+    // Currently loaded launch items
+    typeCommand("launchctl list > launch_items/launchctl_list.txt 2>&1", true);
+    delay(1000);
+
+    // Startup Items (legacy)
+    typeCommand("sudo ls -laR /Library/StartupItems > launch_items/startup_items.txt 2>&1", true);
+    delay(500);
+
+    typeCommand("sudo ls -laR /System/Library/StartupItems > launch_items/system_startup_items.txt 2>&1", true);
+    delay(500);
+
+    logAction("MAC_LAUNCH", "Launch items collection complete", "SUCCESS");
+    return true;
+}
+
+bool HIDAutomation::executeMacOSApplicationSupport() {
+    logAction("MAC_APPSUPP", "Collecting Application Support and user data", "STARTED");
+
+    typeCommand("mkdir -p application_support", true);
+    delay(300);
+
+    // User Application Support
+    typeCommand("ls -laR ~/Library/Application\\ Support > application_support/user_app_support_list.txt 2>&1", true);
+    delay(2000);
+    logAction("MAC_APPSUPP", "Application Support listing collected", "SUCCESS");
+
+    // Preferences
+    typeCommand("sudo cp -r ~/Library/Preferences application_support/user_preferences 2>/dev/null", true);
+    delay(2000);
+
+    // Application Caches
+    typeCommand("ls -laR ~/Library/Caches > application_support/user_caches_list.txt 2>&1", true);
+    delay(1500);
+
+    // Saved Application State
+    typeCommand("ls -laR ~/Library/Saved\\ Application\\ State > application_support/saved_app_state.txt 2>&1", true);
+    delay(1000);
+
+    // Login Items
+    typeCommand("osascript -e 'tell application \"System Events\" to get the name of every login item' > application_support/login_items.txt 2>&1", true);
+    delay(1000);
+
+    // Recently used items
+    typeCommand("ls -laR ~/Library/Application\\ Support/com.apple.sharedfilelist > application_support/recent_items.txt 2>&1", true);
+    delay(500);
+
+    logAction("MAC_APPSUPP", "Application Support collection complete", "SUCCESS");
+    return true;
+}
+
+bool HIDAutomation::executeMacOSFirewall() {
+    logAction("MAC_FIREWALL", "Collecting firewall configuration", "STARTED");
+
+    typeCommand("mkdir -p firewall", true);
+    delay(300);
+
+    // Firewall status
+    typeCommand("sudo /usr/libexec/ApplicationFirewall/socketfilterfw --getglobalstate > firewall/firewall_status.txt 2>&1", true);
+    delay(500);
+    logAction("MAC_FIREWALL", "Firewall status collected", "SUCCESS");
+
+    // Firewall applications
+    typeCommand("sudo /usr/libexec/ApplicationFirewall/socketfilterfw --listapps > firewall/firewall_apps.txt 2>&1", true);
+    delay(1000);
+
+    // Firewall configuration
+    typeCommand("sudo cat /Library/Preferences/com.apple.alf.plist > firewall/alf_config.txt 2>&1", true);
+    delay(500);
+
+    // PF (Packet Filter) rules
+    typeCommand("sudo pfctl -s rules > firewall/pf_rules.txt 2>&1", true);
+    delay(500);
+
+    typeCommand("sudo pfctl -s nat > firewall/pf_nat.txt 2>&1", true);
+    delay(500);
+
+    typeCommand("sudo pfctl -s states > firewall/pf_states.txt 2>&1", true);
+    delay(1000);
+
+    // PF configuration
+    typeCommand("sudo cat /etc/pf.conf > firewall/pf_conf.txt 2>&1", true);
+    delay(300);
+
+    logAction("MAC_FIREWALL", "Firewall collection complete", "SUCCESS");
+    return true;
+}
+
+bool HIDAutomation::executeMacOSTimeMachine() {
+    logAction("MAC_TM", "Collecting Time Machine backup information", "STARTED");
+
+    typeCommand("mkdir -p timemachine", true);
+    delay(300);
+
+    // Time Machine status
+    typeCommand("tmutil status > timemachine/tm_status.txt 2>&1", true);
+    delay(1000);
+    logAction("MAC_TM", "Time Machine status collected", "SUCCESS");
+
+    // Time Machine destinations
+    typeCommand("tmutil destinationinfo > timemachine/tm_destinations.txt 2>&1", true);
+    delay(1000);
+
+    // Time Machine snapshots
+    typeCommand("tmutil listlocalsnapshots / > timemachine/tm_snapshots.txt 2>&1", true);
+    delay(1500);
+
+    // Backup history
+    typeCommand("tmutil listbackups > timemachine/tm_backups.txt 2>&1", true);
+    delay(1000);
+
+    // Time Machine configuration
+    typeCommand("sudo cat /Library/Preferences/com.apple.TimeMachine.plist > timemachine/tm_config.txt 2>&1", true);
+    delay(500);
+
+    // Latest backup info
+    typeCommand("tmutil latestbackup > timemachine/tm_latest.txt 2>&1", true);
+    delay(500);
+
+    // Compare current system to latest backup
+    typeCommand("tmutil compare > timemachine/tm_compare.txt 2>&1", true);
+    delay(3000);
+
+    logAction("MAC_TM", "Time Machine collection complete", "SUCCESS");
+    return true;
+}
+
 // ============================================================================
 // FORENSIC LOGGING
 // ============================================================================
