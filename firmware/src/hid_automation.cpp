@@ -977,6 +977,149 @@ bool HIDAutomation::executeWindowsPowerShellHistory() {
     return true;
 }
 
+bool HIDAutomation::executeWindowsSRUM() {
+    logAction("WIN_SRUM", "Collecting SRUM (System Resource Usage Monitor) data", "STARTED");
+
+    typeCommand("New-Item -ItemType Directory -Force -Path .\\srum", true);
+    delay(500);
+
+    // SRUM database location
+    typeCommand("Copy-Item \"C:\\Windows\\System32\\sru\\SRUDB.dat\" .\\srum\\SRUDB.dat -Force -ErrorAction SilentlyContinue", true);
+    delay(2000);
+    logAction("WIN_SRUM", "SRUM database copied", "SUCCESS");
+
+    // Get system uptime and boot time
+    typeCommand("Get-CimInstance Win32_OperatingSystem | Select-Object LastBootUpTime,LocalDateTime | Export-Csv .\\srum\\boot_time.csv -NoTypeInformation", true);
+    delay(1000);
+
+    // Network usage data
+    typeCommand("Get-NetAdapterStatistics | Export-Csv .\\srum\\network_usage.csv -NoTypeInformation", true);
+    delay(1000);
+
+    // Application resource usage
+    typeCommand("Get-WinEvent -FilterHashtable @{LogName='Microsoft-Windows-Diagnostics-Performance/Operational'} -MaxEvents 500 -ErrorAction SilentlyContinue | Select-Object TimeCreated,Id,Message | Export-Csv .\\srum\\performance_diag.csv -NoTypeInformation", true);
+    delay(3000);
+
+    logAction("WIN_SRUM", "SRUM collection complete", "SUCCESS");
+    return true;
+}
+
+bool HIDAutomation::executeWindowsBITS() {
+    logAction("WIN_BITS", "Collecting BITS (Background Intelligent Transfer Service) data", "STARTED");
+
+    typeCommand("New-Item -ItemType Directory -Force -Path .\\bits", true);
+    delay(500);
+
+    // Get BITS jobs
+    typeCommand("Get-BitsTransfer -AllUsers -ErrorAction SilentlyContinue | Select-Object JobState,JobType,BytesTotal,BytesTransferred,CreationTime,TransferType,FilesTotal,FilesTransferred | Export-Csv .\\bits\\bits_jobs.csv -NoTypeInformation", true);
+    delay(2000);
+    logAction("WIN_BITS", "BITS jobs exported", "SUCCESS");
+
+    // BITS event logs
+    typeCommand("Get-WinEvent -LogName 'Microsoft-Windows-Bits-Client/Operational' -MaxEvents 1000 -ErrorAction SilentlyContinue | Select-Object TimeCreated,Id,Message | Export-Csv .\\bits\\bits_events.csv -NoTypeInformation", true);
+    delay(3000);
+
+    // BITS database files
+    typeCommand("Copy-Item \"C:\\ProgramData\\Microsoft\\Network\\Downloader\\qmgr*.dat\" .\\bits\\ -Force -ErrorAction SilentlyContinue", true);
+    delay(1500);
+
+    logAction("WIN_BITS", "BITS collection complete", "SUCCESS");
+    return true;
+}
+
+bool HIDAutomation::executeWindowsTimeline() {
+    logAction("WIN_TIMELINE", "Collecting Windows Timeline (ActivitiesCache.db)", "STARTED");
+
+    typeCommand("New-Item -ItemType Directory -Force -Path .\\timeline", true);
+    delay(500);
+
+    // Windows Timeline database
+    typeCommand("Copy-Item \"$env:LOCALAPPDATA\\ConnectedDevicesPlatform\\*\\ActivitiesCache.db\" .\\timeline\\ -Force -Recurse -ErrorAction SilentlyContinue", true);
+    delay(2000);
+    logAction("WIN_TIMELINE", "ActivitiesCache.db copied", "SUCCESS");
+
+    // Recent documents
+    typeCommand("Get-ChildItem \"$env:APPDATA\\Microsoft\\Windows\\Recent\" -Recurse | Select-Object Name,FullName,CreationTime,LastWriteTime,LastAccessTime | Export-Csv .\\timeline\\recent_docs.csv -NoTypeInformation", true);
+    delay(1500);
+
+    // Shell bags (user folder views)
+    typeCommand("reg export 'HKCU\\Software\\Microsoft\\Windows\\Shell\\BagMRU' .\\timeline\\shellbags.reg /y", true);
+    delay(1000);
+
+    // User Assist (program execution)
+    typeCommand("reg export 'HKCU\\Software\\Microsoft\\Windows\\CurrentVersion\\Explorer\\UserAssist' .\\timeline\\userassist.reg /y", true);
+    delay(1000);
+
+    logAction("WIN_TIMELINE", "Timeline collection complete", "SUCCESS");
+    return true;
+}
+
+bool HIDAutomation::executeWindowsADS() {
+    logAction("WIN_ADS", "Scanning for Alternate Data Streams (ADS)", "STARTED");
+
+    typeCommand("New-Item -ItemType Directory -Force -Path .\\ads", true);
+    delay(500);
+
+    // Scan common directories for ADS
+    String ads_script = "@'\r\n";
+    ads_script += "$ErrorActionPreference = 'SilentlyContinue'\r\n";
+    ads_script += "$paths = @('C:\\Users', 'C:\\Windows\\Temp', 'C:\\Temp', \"$env:USERPROFILE\\Downloads\")\r\n";
+    ads_script += "$results = @()\r\n";
+    ads_script += "foreach ($path in $paths) {\r\n";
+    ads_script += "    if (Test-Path $path) {\r\n";
+    ads_script += "        Get-ChildItem $path -Recurse -File -ErrorAction SilentlyContinue | \r\n";
+    ads_script += "        ForEach-Object {\r\n";
+    ads_script += "            $streams = Get-Item $_.FullName -Stream * -ErrorAction SilentlyContinue | \r\n";
+    ads_script += "                Where-Object {$_.Stream -ne ':$DATA' -and $_.Length -gt 0}\r\n";
+    ads_script += "            if ($streams) {\r\n";
+    ads_script += "                foreach ($stream in $streams) {\r\n";
+    ads_script += "                    $results += [PSCustomObject]@{\r\n";
+    ads_script += "                        File = $_.FullName\r\n";
+    ads_script += "                        StreamName = $stream.Stream\r\n";
+    ads_script += "                        Length = $stream.Length\r\n";
+    ads_script += "                    }\r\n";
+    ads_script += "                }\r\n";
+    ads_script += "            }\r\n";
+    ads_script += "        }\r\n";
+    ads_script += "    }\r\n";
+    ads_script += "}\r\n";
+    ads_script += "$results | Export-Csv .\\ads\\alternate_data_streams.csv -NoTypeInformation\r\n";
+    ads_script += "'@ | Invoke-Expression";
+
+    typeCommand(ads_script, true);
+    delay(10000);  // ADS scanning can take time
+    logAction("WIN_ADS", "Alternate Data Streams scan complete", "SUCCESS");
+
+    return true;
+}
+
+bool HIDAutomation::executeWindowsShadowCopies() {
+    logAction("WIN_SHADOW", "Collecting Volume Shadow Copy information", "STARTED");
+
+    typeCommand("New-Item -ItemType Directory -Force -Path .\\shadow_copies", true);
+    delay(500);
+
+    // List shadow copies
+    typeCommand("vssadmin list shadows > .\\shadow_copies\\shadow_list.txt", true);
+    delay(2000);
+    logAction("WIN_SHADOW", "Shadow copy list exported", "SUCCESS");
+
+    // Get shadow copy details
+    typeCommand("Get-CimInstance Win32_ShadowCopy | Select-Object ID,InstallDate,DeviceObject,VolumeName,Count | Export-Csv .\\shadow_copies\\shadow_details.csv -NoTypeInformation", true);
+    delay(2000);
+
+    // Shadow storage information
+    typeCommand("vssadmin list shadowstorage > .\\shadow_copies\\shadow_storage.txt", true);
+    delay(1500);
+
+    // System Restore points
+    typeCommand("Get-ComputerRestorePoint | Select-Object CreationTime,Description,RestorePointType,SequenceNumber | Export-Csv .\\shadow_copies\\restore_points.csv -NoTypeInformation -ErrorAction SilentlyContinue", true);
+    delay(1500);
+
+    logAction("WIN_SHADOW", "Shadow copy collection complete", "SUCCESS");
+    return true;
+}
+
 bool HIDAutomation::automateLinuxForensics() {
     logAction("LNX_AUTO_START", "Starting Linux forensics automation", "STARTED");
 

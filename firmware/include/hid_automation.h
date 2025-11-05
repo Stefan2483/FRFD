@@ -174,6 +174,11 @@ public:
     bool executeWindowsWMIPersistence();
     bool executeWindowsUSBHistory();
     bool executeWindowsPowerShellHistory();
+    bool executeWindowsSRUM();
+    bool executeWindowsBITS();
+    bool executeWindowsTimeline();
+    bool executeWindowsADS();
+    bool executeWindowsShadowCopies();
 
     // Linux Automation
     bool executeLinuxSystemInfo();
