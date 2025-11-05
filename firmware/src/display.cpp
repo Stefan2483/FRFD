@@ -694,3 +694,194 @@ String FRFDDisplay::getPhaseTimeString() {
     sprintf(buffer, "%lus", elapsed);
     return String(buffer);
 }
+
+// ============================================================================
+// ENHANCED MODULE TRACKING (Phase 8.0+)
+// ============================================================================
+
+void FRFDDisplay::showModuleStart(const String& moduleName, uint8_t moduleNum, uint8_t totalModules) {
+    tft.fillRect(0, 40, TFT_WIDTH, TFT_HEIGHT - 40, COLOR_BG);
+
+    // Module header
+    tft.setTextColor(COLOR_HEADER, COLOR_BG);
+    tft.setTextSize(1);
+    tft.setCursor(2, 45);
+    tft.print("Module ");
+    tft.print(moduleNum);
+    tft.print("/");
+    tft.print(totalModules);
+
+    // Module name (truncate if too long)
+    tft.setTextColor(COLOR_TEXT, COLOR_BG);
+    tft.setCursor(2, 58);
+    String displayName = moduleName;
+    if (displayName.length() > 16) {
+        displayName = displayName.substring(0, 13) + "...";
+    }
+    tft.print(displayName);
+
+    // Starting indicator
+    tft.setTextColor(COLOR_INFO, COLOR_BG);
+    tft.setCursor(2, 71);
+    tft.print("STARTING...");
+
+    // Progress bar at bottom
+    drawCompactProgressBar(85, 0, "");
+
+    animateActivity();
+}
+
+void FRFDDisplay::showModuleProgress(const String& moduleName, uint8_t progressPercent) {
+    // Update progress bar
+    drawCompactProgressBar(85, progressPercent, "");
+
+    // Show percentage
+    tft.fillRect(2, 71, 76, 12, COLOR_BG);
+    tft.setTextColor(COLOR_INFO, COLOR_BG);
+    tft.setCursor(2, 71);
+    tft.print("Progress: ");
+    tft.print(progressPercent);
+    tft.print("%");
+
+    animateActivity();
+}
+
+void FRFDDisplay::showModuleComplete(const String& moduleName, bool success, unsigned long durationMs) {
+    tft.fillRect(0, 71, TFT_WIDTH, 26, COLOR_BG);
+
+    if (success) {
+        tft.setTextColor(COLOR_SUCCESS, COLOR_BG);
+        tft.setCursor(2, 71);
+        tft.print("COMPLETE");
+        drawCheckmark(65, 71, COLOR_SUCCESS);
+    } else {
+        tft.setTextColor(COLOR_DANGER, COLOR_BG);
+        tft.setCursor(2, 71);
+        tft.print("FAILED");
+    }
+
+    // Duration
+    tft.setTextColor(COLOR_TEXT, COLOR_BG);
+    tft.setCursor(2, 84);
+    tft.print(durationMs / 1000);
+    tft.print(".");
+    tft.print((durationMs % 1000) / 100);
+    tft.print("s");
+
+    drawCompactProgressBar(100, success ? 100 : 0, "");
+}
+
+void FRFDDisplay::showModuleList(const std::vector<String>& modules, const std::vector<bool>& completed) {
+    tft.fillRect(0, 40, TFT_WIDTH, TFT_HEIGHT - 40, COLOR_BG);
+
+    tft.setTextColor(COLOR_HEADER, COLOR_BG);
+    tft.setTextSize(1);
+    tft.setCursor(2, 42);
+    tft.print("Modules:");
+
+    uint8_t y = 55;
+    uint8_t maxDisplay = 8;  // Max modules to show
+    uint8_t startIdx = 0;
+
+    if (modules.size() > maxDisplay) {
+        // Show last modules if we have too many
+        startIdx = modules.size() - maxDisplay;
+    }
+
+    for (uint8_t i = startIdx; i < modules.size() && i < startIdx + maxDisplay; i++) {
+        String modName = modules[i];
+        if (modName.length() > 12) {
+            modName = modName.substring(0, 9) + "...";
+        }
+
+        tft.setTextColor(completed[i] ? COLOR_SUCCESS : COLOR_TEXT, COLOR_BG);
+        tft.setCursor(4, y);
+        tft.print(completed[i] ? "+" : "-");
+        tft.print(" ");
+        tft.print(modName);
+
+        y += 12;
+    }
+}
+
+void FRFDDisplay::showLiveStats(uint8_t modulesCompleted, uint8_t modulesTotal, unsigned long elapsedMs, uint8_t artifactsCollected) {
+    tft.fillRect(0, 100, TFT_WIDTH, 60, COLOR_BG);
+
+    tft.setTextColor(COLOR_HEADER, COLOR_BG);
+    tft.setTextSize(1);
+    tft.setCursor(2, 102);
+    tft.print("Live Stats:");
+
+    // Modules completed
+    tft.setTextColor(COLOR_TEXT, COLOR_BG);
+    tft.setCursor(2, 115);
+    tft.print("Modules: ");
+    tft.setTextColor(COLOR_INFO, COLOR_BG);
+    tft.print(modulesCompleted);
+    tft.print("/");
+    tft.print(modulesTotal);
+
+    // Elapsed time
+    tft.setTextColor(COLOR_TEXT, COLOR_BG);
+    tft.setCursor(2, 128);
+    tft.print("Time: ");
+    tft.setTextColor(COLOR_INFO, COLOR_BG);
+    unsigned long seconds = elapsedMs / 1000;
+    unsigned long minutes = seconds / 60;
+    seconds = seconds % 60;
+    tft.print(minutes);
+    tft.print("m ");
+    tft.print(seconds);
+    tft.print("s");
+
+    // Artifacts collected
+    tft.setTextColor(COLOR_TEXT, COLOR_BG);
+    tft.setCursor(2, 141);
+    tft.print("Artifacts: ");
+    tft.setTextColor(COLOR_SUCCESS, COLOR_BG);
+    tft.print(artifactsCollected);
+
+    // Overall progress bar
+    uint8_t overallProgress = modulesTotal > 0 ? (modulesCompleted * 100) / modulesTotal : 0;
+    drawCompactProgressBar(154, overallProgress, "Overall");
+}
+
+void FRFDDisplay::drawCompactProgressBar(uint8_t y, uint8_t percent, const String& label) {
+    if (percent > 100) percent = 100;
+
+    // Label
+    if (label.length() > 0) {
+        tft.setTextColor(COLOR_TEXT, COLOR_BG);
+        tft.setTextSize(1);
+        tft.setCursor(2, y);
+        tft.print(label);
+        y += 12;
+    }
+
+    // Background
+    tft.fillRect(2, y, TFT_WIDTH - 4, 8, TFT_DARKGREY);
+
+    // Filled portion
+    uint16_t fillWidth = ((TFT_WIDTH - 4) * percent) / 100;
+    uint16_t fillColor = percent < 33 ? COLOR_DANGER : (percent < 66 ? COLOR_WARNING : COLOR_SUCCESS);
+    tft.fillRect(2, y, fillWidth, 8, fillColor);
+
+    // Border
+    tft.drawRect(2, y, TFT_WIDTH - 4, 8, COLOR_TEXT);
+}
+
+void FRFDDisplay::drawModuleStatus(uint8_t y, const String& moduleName, const String& status, uint16_t statusColor) {
+    String displayName = moduleName;
+    if (displayName.length() > 10) {
+        displayName = displayName.substring(0, 7) + "...";
+    }
+
+    tft.setTextColor(COLOR_TEXT, COLOR_BG);
+    tft.setTextSize(1);
+    tft.setCursor(2, y);
+    tft.print(displayName);
+
+    tft.setTextColor(statusColor, COLOR_BG);
+    tft.setCursor(55, y);
+    tft.print(status);
+}
