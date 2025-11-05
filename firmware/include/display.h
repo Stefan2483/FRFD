@@ -5,6 +5,26 @@
 #include <TFT_eSPI.h>
 #include "config.h"
 
+// HID Automation Phase Tracking
+enum HIDPhase {
+    HID_PHASE_INIT,
+    HID_PHASE_DETECTING,
+    HID_PHASE_OS_DETECTED,
+    HID_PHASE_COLLECTING,
+    HID_PHASE_COMPLETE,
+    HID_PHASE_ERROR
+};
+
+struct HIDPhaseInfo {
+    HIDPhase phase;
+    String phaseName;
+    String currentStep;
+    uint8_t currentStepNum;
+    uint8_t totalSteps;
+    uint8_t phaseProgress;
+    unsigned long phaseStartTime;
+};
+
 class FRFDDisplay {
 private:
     TFT_eSPI tft;
@@ -15,6 +35,11 @@ private:
     uint8_t progress;
     unsigned long startTime;
     bool networkActive;
+
+    // HID Automation tracking
+    HIDPhaseInfo hidPhase;
+    bool hidMode;
+    uint8_t animFrame;
 
     // Color scheme
     const uint16_t COLOR_BG = TFT_BLACK;
@@ -63,6 +88,34 @@ public:
     void drawHeader();
     void drawProgressBar(uint8_t x, uint8_t y, uint8_t w, uint8_t h, uint8_t percent);
     void drawRiskIndicator();
+
+    // HID Automation Display Methods
+    void showHIDAutomationStart();
+    void showHIDPhase(HIDPhase phase, const String& phaseName);
+    void showHIDDetecting(const String& method);
+    void showHIDOSDetected(OperatingSystem os, uint8_t confidence);
+    void showHIDCollection(const String& moduleName, uint8_t current, uint8_t total);
+    void showHIDProgress(uint8_t stepNum, uint8_t totalSteps, const String& stepName, uint8_t progress);
+    void showHIDComplete(uint8_t totalActions, unsigned long durationMs);
+    void showHIDError(const String& error);
+
+    // HID Phase Management
+    void startHIDMode();
+    void updateHIDPhase(HIDPhase phase, const String& phaseName = "");
+    void updateHIDStep(uint8_t current, uint8_t total, const String& stepName);
+    void updateHIDProgress(uint8_t percent);
+    void endHIDMode();
+
+    // Visual Effects
+    void drawSpinner(uint8_t x, uint8_t y, uint8_t radius, uint16_t color);
+    void drawCheckmark(uint8_t x, uint8_t y, uint16_t color);
+    void drawPhaseIndicator(uint8_t phase, uint8_t totalPhases, uint8_t currentPhase);
+    void drawStepProgress(uint8_t current, uint8_t total, uint8_t y);
+    void animateActivity();
+
+    // Helper methods for HID display
+    String getHIDPhaseString(HIDPhase phase);
+    String getPhaseTimeString();
 };
 
 #endif // DISPLAY_H

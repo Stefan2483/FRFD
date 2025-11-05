@@ -49,6 +49,9 @@ private:
     // Evidence collection
     std::vector<ForensicsArtifact> artifacts;
 
+    // HID automation tracking
+    unsigned long automation_start_time;
+
     // Private methods
     void loadConfiguration();
     void initializeUSB();
@@ -100,6 +103,9 @@ public:
     bool runHIDAutomation();
     OSDetectionResult detectOSViaHID();
     bool automateForensicsCollection();
+    bool automateWindowsWithDisplay(uint8_t totalModules);
+    bool automateLinuxWithDisplay(uint8_t totalModules);
+    bool automateMacOSWithDisplay(uint8_t totalModules);
     void saveHIDLog();
 
     // Script execution

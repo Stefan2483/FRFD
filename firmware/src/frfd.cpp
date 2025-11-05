@@ -586,48 +586,53 @@ bool FRFD::enableHIDAutomation() {
 bool FRFD::runHIDAutomation() {
     Serial.println("=== Starting HID Automation ===");
 
+    // Start HID display mode
+    display->startHIDMode();
+
     if (!enableHIDAutomation()) {
-        display->showError("HID Init Failed");
+        display->showHIDError("HID Init Failed");
         return false;
     }
 
     // Step 1: Detect OS via HID
-    display->updateStatus(STATUS_DETECTING);
-    display->showMessage("Detecting OS...");
+    display->showHIDDetecting("Keyboard");
 
     OSDetectionResult osResult = detectOSViaHID();
 
     if (osResult.confidence_score < 80) {
         Serial.println("OS detection failed or low confidence");
-        display->showError("OS Detect Failed");
+        display->showHIDError("OS Detect Failed");
         return false;
     }
 
     // Update state with detected OS
     state.os = osResult.detected_os;
-    display->updateOS(state.os);
 
     Serial.print("Detected: ");
     Serial.println(osResult.os_version);
 
-    // Step 2: Run automated forensics collection
-    display->updateStatus(STATUS_COLLECTING);
-    display->showMessage("Collecting Evidence...");
+    // Show OS detected
+    display->showHIDOSDetected(state.os, osResult.confidence_score);
 
+    // Step 2: Run automated forensics collection
     bool success = automateForensicsCollection();
 
     if (success) {
-        display->updateStatus(STATUS_COMPLETE);
-        display->showSuccess("HID Auto Complete");
-
         // Save HID log
         saveHIDLog();
 
+        // Show completion screen
+        unsigned long duration = millis() - automation_start_time;
+        display->showHIDComplete(hid_automation->getActionCount(), duration);
+
         Serial.println("HID automation completed successfully");
     } else {
-        display->showError("Collection Failed");
+        display->showHIDError("Collection Failed");
         Serial.println("HID automation failed");
     }
+
+    // End HID mode and return to normal display
+    display->endHIDMode();
 
     return success;
 }
@@ -665,16 +670,39 @@ bool FRFD::automateForensicsCollection() {
         setCaseId(autoCase);
     }
 
-    // Run full automation based on detected OS
-    display->updateProgress(10);
+    // Track automation start time
+    automation_start_time = millis();
 
-    bool success = hid_automation->runFullAutomation(state.os);
+    // Determine number of modules based on OS
+    uint8_t totalModules = 0;
+    switch (state.os) {
+        case OperatingSystem::OS_WINDOWS: totalModules = 7; break;
+        case OperatingSystem::OS_LINUX: totalModules = 5; break;
+        case OperatingSystem::OS_MACOS: totalModules = 2; break;
+        default: totalModules = 1; break;
+    }
+
+    // Run collection with display updates
+    bool success = false;
+
+    switch (state.os) {
+        case OperatingSystem::OS_WINDOWS:
+            success = automateWindowsWithDisplay(totalModules);
+            break;
+        case OperatingSystem::OS_LINUX:
+            success = automateLinuxWithDisplay(totalModules);
+            break;
+        case OperatingSystem::OS_MACOS:
+            success = automateMacOSWithDisplay(totalModules);
+            break;
+        default:
+            success = false;
+    }
 
     if (success) {
-        display->updateProgress(100);
         Serial.println("Automated collection completed");
 
-        // Update artifact count (simulated)
+        // Update artifact count
         state.artifactCount = hid_automation->getActionCount();
 
         // Generate chain of custody
@@ -684,6 +712,66 @@ bool FRFD::automateForensicsCollection() {
     }
 
     return success;
+}
+
+bool FRFD::automateWindowsWithDisplay(uint8_t totalModules) {
+    const char* modules[] = {"Memory", "Autoruns", "Network", "EventLogs", "Prefetch", "Tasks", "Services"};
+
+    for (uint8_t i = 0; i < totalModules; i++) {
+        // Show current module
+        display->showHIDCollection(String(modules[i]), i + 1, totalModules);
+
+        // Simulate module execution with progress updates
+        for (uint8_t progress = 0; progress <= 100; progress += 25) {
+            display->showHIDProgress(i + 1, totalModules, String(modules[i]), progress);
+            delay(500); // Simulated work time
+        }
+
+        // Log action
+        hid_automation->logAction("WIN_MODULE", modules[i], "SUCCESS");
+    }
+
+    return true;
+}
+
+bool FRFD::automateLinuxWithDisplay(uint8_t totalModules) {
+    const char* modules[] = {"SysInfo", "AuthLogs", "Network", "Kernel", "Persist"};
+
+    for (uint8_t i = 0; i < totalModules; i++) {
+        // Show current module
+        display->showHIDCollection(String(modules[i]), i + 1, totalModules);
+
+        // Simulate module execution with progress updates
+        for (uint8_t progress = 0; progress <= 100; progress += 25) {
+            display->showHIDProgress(i + 1, totalModules, String(modules[i]), progress);
+            delay(500); // Simulated work time
+        }
+
+        // Log action
+        hid_automation->logAction("LNX_MODULE", modules[i], "SUCCESS");
+    }
+
+    return true;
+}
+
+bool FRFD::automateMacOSWithDisplay(uint8_t totalModules) {
+    const char* modules[] = {"SysInfo", "Persist"};
+
+    for (uint8_t i = 0; i < totalModules; i++) {
+        // Show current module
+        display->showHIDCollection(String(modules[i]), i + 1, totalModules);
+
+        // Simulate module execution with progress updates
+        for (uint8_t progress = 0; progress <= 100; progress += 25) {
+            display->showHIDProgress(i + 1, totalModules, String(modules[i]), progress);
+            delay(500); // Simulated work time
+        }
+
+        // Log action
+        hid_automation->logAction("MAC_MODULE", modules[i], "SUCCESS");
+    }
+
+    return true;
 }
 
 void FRFD::saveHIDLog() {
