@@ -5,6 +5,7 @@
 
 FRFD::FRFD() {
     display = new FRFDDisplay();
+    storage = new FRFDStorage();
     state.mode = MODE_IDLE;
     state.os = OS_UNKNOWN;
     state.risk = RISK_UNKNOWN;
@@ -20,6 +21,7 @@ FRFD::FRFD() {
 
 FRFD::~FRFD() {
     delete display;
+    delete storage;
 }
 
 bool FRFD::begin() {
@@ -38,7 +40,9 @@ bool FRFD::begin() {
 
     // Initialize subsystems
     initializeUSB();
-    initializeStorage();
+
+    // Initialize storage
+    storage->begin();
 
     Serial.println("FRFD initialized successfully");
     display->showMainHUD();
@@ -100,21 +104,6 @@ void FRFD::initializeWiFi() {
     } else {
         Serial.println("Failed to start WiFi AP");
         wifiActive = false;
-    }
-}
-
-void FRFD::initializeStorage() {
-    Serial.println("Initializing storage...");
-
-    // Initialize SD card
-    if (SD.begin(SD_CS)) {
-        Serial.println("SD card initialized");
-        uint64_t cardSize = SD.cardSize() / (1024 * 1024);
-        Serial.print("SD card size: ");
-        Serial.print(cardSize);
-        Serial.println(" MB");
-    } else {
-        Serial.println("SD card not found or failed to initialize");
     }
 }
 
@@ -525,6 +514,11 @@ void FRFD::setCaseId(const String& caseId) {
     state.caseId = caseId;
     Serial.print("Case ID set: ");
     Serial.println(caseId);
+
+    // Create case directory on SD card
+    if (storage->isSDCardAvailable()) {
+        storage->createCaseDirectory(caseId);
+    }
 }
 
 void FRFD::setResponder(const String& responder) {

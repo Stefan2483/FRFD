@@ -6,6 +6,7 @@
 #include <ArduinoJson.h>
 #include "config.h"
 #include "display.h"
+#include "storage.h"
 
 struct DeviceState {
     OperatingMode mode;
@@ -31,6 +32,7 @@ struct ForensicsArtifact {
 class FRFD {
 private:
     FRFDDisplay* display;
+    FRFDStorage* storage;
     DeviceState state;
 
     // Configuration
