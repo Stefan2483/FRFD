@@ -67,10 +67,14 @@ struct HIDSequence {
 struct OSDetectionResult {
     OperatingSystem detected_os;
     String os_version;
+    String os_version_major;     // e.g., "10", "11" for Windows
+    String os_version_minor;     // e.g., "0", "22H2"
     String hostname;
     bool is_admin;
     String detection_method;
     int confidence_score;        // 0-100
+    bool legacy_os;              // True if OS is older version
+    String compatible_features;   // CSV of supported features
 };
 
 /**
@@ -123,6 +127,8 @@ public:
     // Initialization
     bool begin(FRFDStorage* storage_ptr);
     void setStorage(FRFDStorage* storage_ptr);
+    void setDisplay(FRFDDisplay* display_ptr);
+    void enableDisplay(bool enabled);
 
     // OS Detection
     OSDetectionResult detectOS();
@@ -348,7 +354,7 @@ public:
     bool isHIDReady();
     void setVerbose(bool verbose);
 
-    // Error Handling (Enhanced)
+    // Error Handling (Enhanced v1.2.0+)
     ModuleResult executeModuleWithRetry(
         const String& module_name,
         std::function<bool()> module_func,
@@ -360,6 +366,25 @@ public:
     void clearErrorHistory();
     bool hasErrors() const { return !module_results.empty() && module_results.back().success == false; }
     String getLastError() const { return last_error; }
+    bool executeWithErrorHandling(const String& module_name, std::function<bool()> func);
+    void handleModuleError(const String& module_name, const String& error);
+    bool shouldContinueAfterError(const String& module_name);
+
+    // Auto-Start and Workflow (v1.2.0+)
+    bool autoStartCollection();
+    bool detectUSBConnection();
+    void startAutomatedWorkflow();
+    void setAutoStart(bool enabled);
+    bool isAutoStartEnabled() const { return auto_start_enabled; }
+
+    // OS Version Compatibility (v1.2.0+)
+    bool detectOSVersion();
+    bool isLegacyWindows();  // Windows 7/8/8.1
+    bool isModernWindows();  // Windows 10/11
+    bool isLegacyLinux();    // Kernel < 3.0
+    bool isLegacyMacOS();    // macOS < 10.13
+    String getCompatibleCommand(const String& module, const String& modern_cmd, const String& legacy_cmd);
+    void adjustForLegacyOS();
 
     // Getters
     const std::vector<ForensicActionLog>& getActionLog() const { return action_log; }
@@ -393,6 +418,19 @@ private:
     std::vector<ModuleResult> module_results;
     bool continue_on_error;
     uint8_t default_max_retries;
+
+    // Auto-Start and Display (v1.2.0+)
+    bool auto_start_enabled;
+    FRFDDisplay* display;
+    bool display_enabled;
+    uint16_t modules_completed;
+    uint16_t modules_total;
+
+    // OS Version Compatibility (v1.2.0+)
+    bool legacy_windows;
+    bool legacy_linux;
+    bool legacy_macos;
+    String os_kernel_version;
 
     // OS Detection Helpers
     bool detectWindowsVersion(String& version);

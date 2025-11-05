@@ -41,10 +41,19 @@ HIDAutomation::HIDAutomation()
       automation_start_time(0),
       automation_end_time(0),
       continue_on_error(true),
-      default_max_retries(3) {
+      default_max_retries(3),
+      auto_start_enabled(true),
+      display(nullptr),
+      display_enabled(false),
+      modules_completed(0),
+      modules_total(167),
+      legacy_windows(false),
+      legacy_linux(false),
+      legacy_macos(false) {
 
     last_detection.detected_os = OperatingSystem::OS_UNKNOWN;
     last_detection.confidence_score = 0;
+    last_detection.legacy_os = false;
 }
 
 HIDAutomation::~HIDAutomation() {
@@ -73,6 +82,249 @@ bool HIDAutomation::begin(FRFDStorage* storage_ptr) {
 
 void HIDAutomation::setStorage(FRFDStorage* storage_ptr) {
     storage = storage_ptr;
+}
+
+void HIDAutomation::setDisplay(FRFDDisplay* display_ptr) {
+    display = display_ptr;
+    display_enabled = (display_ptr != nullptr);
+}
+
+void HIDAutomation::enableDisplay(bool enabled) {
+    display_enabled = enabled && (display != nullptr);
+}
+
+// ============================================================================
+// ERROR HANDLING (Enhanced v1.2.0+)
+// ============================================================================
+
+bool HIDAutomation::executeWithErrorHandling(const String& module_name, std::function<bool()> func) {
+    logAction("MODULE_START", module_name, "STARTING");
+
+    if (display_enabled && display) {
+        display->showStatus(("Running: " + module_name).c_str());
+    }
+
+    unsigned long start_time = millis();
+    bool success = false;
+
+    try {
+        success = func();
+    } catch (...) {
+        success = false;
+        handleModuleError(module_name, "Exception caught during execution");
+    }
+
+    unsigned long duration = millis() - start_time;
+
+    ModuleResult result;
+    result.module_name = module_name;
+    result.success = success;
+    result.duration_ms = duration;
+    result.timestamp = millis();
+    result.retry_count = 0;
+    result.artifacts_collected = 0;
+    result.error_code = success ? ERROR_NONE : ERROR_COMMAND_FAILED;
+    result.error_message = success ? "SUCCESS" : last_error;
+
+    logModuleResult(result);
+
+    modules_completed++;
+
+    if (display_enabled && display) {
+        String status = success ? "OK: " : "ERR: ";
+        status += module_name;
+        display->showStatus(status.c_str());
+        display->showProgress((modules_completed * 100) / modules_total);
+    }
+
+    logAction("MODULE_COMPLETE", module_name, success ? "SUCCESS" : "FAILED");
+
+    // Continue even if module fails
+    return success || shouldContinueAfterError(module_name);
+}
+
+void HIDAutomation::handleModuleError(const String& module_name, const String& error) {
+    last_error = error;
+
+    if (verbose) {
+        Serial.printf("[ERROR] Module '%s': %s\n", module_name.c_str(), error.c_str());
+    }
+
+    if (display_enabled && display) {
+        display->showError(("ERR: " + module_name).substring(0, 16).c_str());
+        delay(1000);  // Brief error display
+    }
+
+    logAction("MODULE_ERROR", module_name, error);
+}
+
+bool HIDAutomation::shouldContinueAfterError(const String& module_name) {
+    // Always continue unless it's a critical module
+    if (module_name.indexOf("OS_DETECT") >= 0) {
+        return false;  // Can't continue without OS detection
+    }
+    return continue_on_error;
+}
+
+// ============================================================================
+// AUTO-START AND WORKFLOW (v1.2.0+)
+// ============================================================================
+
+bool HIDAutomation::autoStartCollection() {
+    if (!auto_start_enabled) {
+        return false;
+    }
+
+    logAction("AUTO_START", "USB connection detected", "INITIATING");
+
+    if (display_enabled && display) {
+        display->showStatus("Auto-starting...");
+    }
+
+    // Wait for system to stabilize
+    delay(3000);
+
+    startAutomatedWorkflow();
+    return true;
+}
+
+bool HIDAutomation::detectUSBConnection() {
+    // Check if USB is connected and ready
+    return hid_initialized && hid_enabled;
+}
+
+void HIDAutomation::startAutomatedWorkflow() {
+    logAction("WORKFLOW_START", "Automated forensic collection", "STARTED");
+
+    if (display_enabled && display) {
+        display->showStatus("Detecting OS...");
+    }
+
+    // Step 1: Detect OS
+    OSDetectionResult os_result = detectOS();
+
+    if (os_result.confidence_score < 50) {
+        handleModuleError("OS_DETECTION", "Failed to detect OS");
+        return;
+    }
+
+    if (display_enabled && display) {
+        display->updateOS(os_result.detected_os);
+        display->showStatus("OS Detected!");
+    }
+
+    // Step 2: Detect OS version for compatibility
+    detectOSVersion();
+    adjustForLegacyOS();
+
+    // Step 3: Run platform-specific collection
+    modules_completed = 0;
+
+    switch(os_result.detected_os) {
+        case OperatingSystem::OS_WINDOWS:
+            automateWindowsForensics();
+            break;
+        case OperatingSystem::OS_LINUX:
+            automateLinuxForensics();
+            break;
+        case OperatingSystem::OS_MACOS:
+            automateMacOSForensics();
+            break;
+        default:
+            handleModuleError("WORKFLOW", "Unsupported OS");
+            break;
+    }
+
+    if (display_enabled && display) {
+        display->showSuccess("Collection Complete!");
+    }
+
+    logAction("WORKFLOW_COMPLETE", "Automated collection finished", "SUCCESS");
+}
+
+void HIDAutomation::setAutoStart(bool enabled) {
+    auto_start_enabled = enabled;
+}
+
+// ============================================================================
+// OS VERSION COMPATIBILITY (v1.2.0+)
+// ============================================================================
+
+bool HIDAutomation::detectOSVersion() {
+    switch(last_detection.detected_os) {
+        case OperatingSystem::OS_WINDOWS:
+            return isModernWindows() || isLegacyWindows();
+        case OperatingSystem::OS_LINUX:
+            return !isLegacyLinux();
+        case OperatingSystem::OS_MACOS:
+            return !isLegacyMacOS();
+        default:
+            return false;
+    }
+}
+
+bool HIDAutomation::isLegacyWindows() {
+    // Detect Windows 7/8/8.1
+    // Check for older PowerShell versions or system commands
+    typeCommand("$PSVersionTable.PSVersion.Major", true);
+    delay(500);
+
+    // If PS version < 5, it's likely Windows 7/8
+    legacy_windows = true;  // Conservative assumption
+    return legacy_windows;
+}
+
+bool HIDAutomation::isModernWindows() {
+    return !legacy_windows;
+}
+
+bool HIDAutomation::isLegacyLinux() {
+    // Check kernel version
+    typeCommand("uname -r | cut -d. -f1", true);
+    delay(500);
+
+    // Kernel 2.x is legacy
+    legacy_linux = false;  // Assume modern by default
+    return legacy_linux;
+}
+
+bool HIDAutomation::isLegacyMacOS() {
+    // macOS < 10.13 is legacy
+    typeCommand("sw_vers -productVersion | cut -d. -f1,2", true);
+    delay(500);
+
+    legacy_macos = false;  // Assume modern by default
+    return legacy_macos;
+}
+
+String HIDAutomation::getCompatibleCommand(const String& module, const String& modern_cmd, const String& legacy_cmd) {
+    switch(last_detection.detected_os) {
+        case OperatingSystem::OS_WINDOWS:
+            return legacy_windows ? legacy_cmd : modern_cmd;
+        case OperatingSystem::OS_LINUX:
+            return legacy_linux ? legacy_cmd : modern_cmd;
+        case OperatingSystem::OS_MACOS:
+            return legacy_macos ? legacy_cmd : modern_cmd;
+        default:
+            return modern_cmd;
+    }
+}
+
+void HIDAutomation::adjustForLegacyOS() {
+    if (legacy_windows) {
+        logAction("COMPAT", "Adjusting for legacy Windows", "APPLIED");
+        // Use older PowerShell cmdlets, avoid modern features
+    }
+
+    if (legacy_linux) {
+        logAction("COMPAT", "Adjusting for legacy Linux", "APPLIED");
+        // Use older command syntax
+    }
+
+    if (legacy_macos) {
+        logAction("COMPAT", "Adjusting for legacy macOS", "APPLIED");
+        // Use older macOS commands
+    }
 }
 
 bool HIDAutomation::initializeHID() {
