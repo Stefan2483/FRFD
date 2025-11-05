@@ -195,6 +195,30 @@ public:
     bool executeWindowsCertificates();
     bool executeWindowsActivation();
 
+    // Advanced Windows Forensics (v1.1.0+)
+    bool executeWindowsSearchDatabase();
+    bool executeWindowsActivitiesCache();
+    bool executeWindowsNotificationDB();
+    bool executeWindowsClipboardHistory();
+    bool executeWindowsConnectedDevices();
+    bool executeWindowsBackgroundTasks();
+    bool executeWindowsCortanaHistory();
+    bool executeWindowsOfficeRecent();
+    bool executeWindowsStickyNotes();
+    bool executeWindowsScreenTime();
+    bool executeWindowsAppExecAlias();
+    bool executeWindowsPackageManager();
+    bool executeWindowsUpdateDetails();
+    bool executeWindowsPerformanceCounters();
+    bool executeWindowsSecurityAnalysis();
+    bool executeWindowsRDPCache();
+    bool executeWindowsTerminalServerClient();
+    bool executeWindowsUSNJournal();
+    bool executeWindowsVolumeInformation();
+    bool executeWindowsSRUMDetailed();
+    bool executeWindowsIISLogs();
+    bool executeWindowsGroupPolicy();
+
     // Linux Automation
     bool executeLinuxSystemInfo();
     bool executeLinuxAuthLogs();
@@ -231,6 +255,30 @@ public:
     bool executeLinuxXorgLogs();
     bool executeLinuxBashHistory();
 
+    // Advanced Linux Forensics (v1.1.0+)
+    bool executeLinuxAppArmorProfiles();
+    bool executeLinuxKubernetesPods();
+    bool executeLinuxContainerInspection();
+    bool executeLinuxSystemdAnalyze();
+    bool executeLinuxJournalCorruption();
+    bool executeLinuxUserActivityTimeline();
+    bool executeLinuxSudoHistory();
+    bool executeLinuxLastCommand();
+    bool executeLinuxFailedLogins();
+    bool executeLinuxOpenSSLCertificates();
+    bool executeLinuxSystemCalls();
+    bool executeLinuxKernelParameters();
+    bool executeLinuxMemoryMaps();
+    bool executeLinuxSocketStatistics();
+    bool executeLinuxIPTables();
+    bool executeLinuxNFTables();
+    bool executeLinuxNetworkNamespaces();
+    bool executeLinuxCGroups();
+    bool executeLinuxCapabilities();
+    bool executeLinuxEbpfPrograms();
+    bool executeLinuxInitRamfs();
+    bool executeLinuxGrubConfig();
+
     // macOS Automation
     bool executeMacOSSystemInfo();
     bool executeMacOSPersistence();
@@ -262,6 +310,30 @@ public:
     bool executeMacOSUserDefaults();
     bool executeMacOSRecentItems();
     bool executeMacOSNotificationCenter();
+
+    // Advanced macOS Forensics (v1.1.0+)
+    bool executeMacOSUnifiedLogsAdvanced();
+    bool executeMacOSAPFSSnapshots();
+    bool executeMacOSNotificationDBv2();
+    bool executeMacOSQuarantineEventsV2();
+    bool executeMacOSTCCDatabase();
+    bool executeMacOSKnowledgeC();
+    bool executeMacOSiCloudAccounts();
+    bool executeMacOSKeychainAnalysis();
+    bool executeMacOSAirDropHistory();
+    bool executeMacOSHandoffActivities();
+    bool executeMacOSSpotlightShortcuts();
+    bool executeMacOSCoreAnalytics();
+    bool executeMacOSXProtectLogs();
+    bool executeMacOSMRTLogs();
+    bool executeMacOSAirPlayReceivers();
+    bool executeMacOSShareKitContacts();
+    bool executeMacOSSiriAnalytics();
+    bool executeMacOSCrashReporter();
+    bool executeMacOSCodesignVerification();
+    bool executeMacOSBSMaudit();
+    bool executeMacOSPowerMetrics();
+    bool executeMacOSAccountsPlist();
 
     // Forensic Logging
     void logAction(const String& action_type, const String& command, const String& result);
