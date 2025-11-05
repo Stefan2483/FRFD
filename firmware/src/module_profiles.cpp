@@ -93,69 +93,85 @@ CollectionProfile ModuleProfileManager::getStandardProfile(OperatingSystem os) {
     profile.estimated_duration_ms = 420000;  // 7 minutes
 
     if (os == OS_WINDOWS || os == OS_UNKNOWN) {
-        // Windows standard modules - current implementation
+        // Windows standard modules - balanced forensics
         profile.modules.push_back(createModuleConfig(
-            Modules::Windows::MEMORY, true, 1, 60,
+            Modules::Windows::BROWSER_HISTORY, true, 1, 180,
+            "Browser history (Chrome, Firefox, Edge)"
+        ));
+        profile.modules.push_back(createModuleConfig(
+            Modules::Windows::MEMORY, true, 2, 60,
             "Process information and memory artifacts"
         ));
         profile.modules.push_back(createModuleConfig(
-            Modules::Windows::AUTORUNS, true, 2, 90,
+            Modules::Windows::AUTORUNS, true, 3, 90,
             "Autorun entries (persistence)"
         ));
         profile.modules.push_back(createModuleConfig(
-            Modules::Windows::NETWORK, true, 3, 90,
+            Modules::Windows::NETWORK, true, 4, 90,
             "Network state (TCP, DNS, ARP)"
         ));
         profile.modules.push_back(createModuleConfig(
-            Modules::Windows::EVENTLOGS, true, 4, 180,
+            Modules::Windows::EVENTLOGS, true, 5, 180,
             "Event logs (Security, System, Application)"
         ));
         profile.modules.push_back(createModuleConfig(
-            Modules::Windows::PREFETCH, true, 5, 60,
+            Modules::Windows::PREFETCH, true, 6, 60,
             "Prefetch files"
         ));
         profile.modules.push_back(createModuleConfig(
-            Modules::Windows::SCHTASKS, true, 6, 60,
+            Modules::Windows::SCHTASKS, true, 7, 60,
             "Scheduled tasks"
         ));
         profile.modules.push_back(createModuleConfig(
-            Modules::Windows::SERVICES, true, 7, 60,
+            Modules::Windows::SERVICES, true, 8, 60,
             "Services information"
         ));
     }
 
     if (os == OS_LINUX || os == OS_UNKNOWN) {
-        // Linux standard modules
+        // Linux standard modules - balanced forensics
         profile.modules.push_back(createModuleConfig(
-            Modules::Linux::SYSINFO, true, 1, 60,
+            Modules::Linux::SHELL_HISTORY, true, 1, 60,
+            "Shell history (bash, zsh)"
+        ));
+        profile.modules.push_back(createModuleConfig(
+            Modules::Linux::BROWSER_HISTORY, true, 2, 120,
+            "Browser history (Firefox, Chrome)"
+        ));
+        profile.modules.push_back(createModuleConfig(
+            Modules::Linux::SYSINFO, true, 3, 60,
             "System information"
         ));
         profile.modules.push_back(createModuleConfig(
-            Modules::Linux::AUTHLOGS, true, 2, 90,
+            Modules::Linux::AUTHLOGS, true, 4, 90,
             "Authentication logs"
         ));
         profile.modules.push_back(createModuleConfig(
-            Modules::Linux::NETSTAT, true, 3, 60,
+            Modules::Linux::NETSTAT, true, 5, 60,
             "Network connections"
         ));
         profile.modules.push_back(createModuleConfig(
-            Modules::Linux::KERNEL_MODULES, true, 4, 30,
+            Modules::Linux::KERNEL_MODULES, true, 6, 30,
             "Loaded kernel modules"
         ));
         profile.modules.push_back(createModuleConfig(
-            Modules::Linux::PERSISTENCE, true, 5, 120,
+            Modules::Linux::PERSISTENCE, true, 7, 120,
             "Persistence mechanisms (cron, systemd)"
         ));
     }
 
     if (os == OS_MACOS || os == OS_UNKNOWN) {
-        // macOS standard modules
+        // macOS standard modules - balanced forensics
         profile.modules.push_back(createModuleConfig(
-            Modules::macOS::SYSINFO, true, 1, 60,
+            Modules::macOS::BROWSER_HISTORY, true, 1, 120,
+            "Browser history (Safari, Chrome, Firefox)"
+        ));
+        profile.modules.push_back(createModuleConfig(
+            Modules::macOS::SYSINFO, true, 2, 60,
             "System information"
         ));
         profile.modules.push_back(createModuleConfig(
-            Modules::macOS::PERSISTENCE, true, 2, 120,
+            Modules::macOS::PERSISTENCE, true, 3, 120,
             "Launch agents and daemons"
         ));
     }
@@ -174,27 +190,27 @@ CollectionProfile ModuleProfileManager::getDeepProfile(OperatingSystem os) {
         // Windows deep - all modules including new ones
         profile.modules.push_back(createModuleConfig(
             Modules::Windows::REGISTRY, true, 1, 300,
-            "Registry hives (SAM, SYSTEM, SOFTWARE, SECURITY)"
+            "Registry hives (SAM, SYSTEM, SOFTWARE, SECURITY, NTUSER)"
         ));
         profile.modules.push_back(createModuleConfig(
             Modules::Windows::MFT, true, 2, 600,
-            "MFT and timeline artifacts"
+            "MFT and timeline artifacts (USN Journal)"
         ));
         profile.modules.push_back(createModuleConfig(
-            Modules::Windows::EVENTLOGS, true, 3, 300,
-            "All event logs"
-        ));
-        profile.modules.push_back(createModuleConfig(
-            Modules::Windows::BROWSER_HISTORY, true, 4, 180,
+            Modules::Windows::BROWSER_HISTORY, true, 3, 180,
             "Browser history (Chrome, Firefox, Edge)"
         ));
         profile.modules.push_back(createModuleConfig(
-            Modules::Windows::MEMORY, true, 5, 120,
-            "Process and memory artifacts"
+            Modules::Windows::USER_FILES, true, 4, 240,
+            "User file metadata (Downloads, Desktop, Documents, Recent)"
         ));
         profile.modules.push_back(createModuleConfig(
-            Modules::Windows::USER_FILES, true, 6, 240,
-            "User file metadata (Downloads, Desktop, Documents)"
+            Modules::Windows::EVENTLOGS, true, 5, 300,
+            "All event logs"
+        ));
+        profile.modules.push_back(createModuleConfig(
+            Modules::Windows::MEMORY, true, 6, 120,
+            "Process and memory artifacts"
         ));
         profile.modules.push_back(createModuleConfig(
             Modules::Windows::NETWORK, true, 7, 90,
@@ -223,26 +239,26 @@ CollectionProfile ModuleProfileManager::getDeepProfile(OperatingSystem os) {
     }
 
     if (os == OS_LINUX || os == OS_UNKNOWN) {
-        // Linux deep - comprehensive
+        // Linux deep - comprehensive with new modules
         profile.modules.push_back(createModuleConfig(
             Modules::Linux::SHELL_HISTORY, true, 1, 90,
-            "Shell history for all users"
+            "Shell history for all users (bash, zsh)"
         ));
         profile.modules.push_back(createModuleConfig(
             Modules::Linux::SSH_CONFIG, true, 2, 90,
-            "SSH configuration and keys"
+            "SSH configuration, authorized keys, known hosts"
         ));
         profile.modules.push_back(createModuleConfig(
             Modules::Linux::USER_ACCOUNTS, true, 3, 60,
-            "User account database"
+            "User account database (passwd, shadow, group)"
         ));
         profile.modules.push_back(createModuleConfig(
-            Modules::Linux::AUTHLOGS, true, 4, 120,
+            Modules::Linux::BROWSER_HISTORY, true, 4, 180,
+            "Browser history (Firefox, Chrome, Chromium)"
+        ));
+        profile.modules.push_back(createModuleConfig(
+            Modules::Linux::AUTHLOGS, true, 5, 120,
             "Authentication logs"
-        ));
-        profile.modules.push_back(createModuleConfig(
-            Modules::Linux::BROWSER_HISTORY, true, 5, 180,
-            "Browser history (Firefox, Chrome)"
         ));
         profile.modules.push_back(createModuleConfig(
             Modules::Linux::DOCKER, true, 6, 240,
@@ -250,7 +266,7 @@ CollectionProfile ModuleProfileManager::getDeepProfile(OperatingSystem os) {
         ));
         profile.modules.push_back(createModuleConfig(
             Modules::Linux::PERSISTENCE, true, 7, 180,
-            "All persistence mechanisms"
+            "All persistence mechanisms (cron, systemd)"
         ));
         profile.modules.push_back(createModuleConfig(
             Modules::Linux::NETSTAT, true, 8, 90,
@@ -267,14 +283,14 @@ CollectionProfile ModuleProfileManager::getDeepProfile(OperatingSystem os) {
     }
 
     if (os == OS_MACOS || os == OS_UNKNOWN) {
-        // macOS deep - comprehensive
+        // macOS deep - comprehensive with new modules
         profile.modules.push_back(createModuleConfig(
             Modules::macOS::UNIFIED_LOGS, true, 1, 300,
-            "Unified logs collection"
+            "Unified logs (errors, security, auth, network)"
         ));
         profile.modules.push_back(createModuleConfig(
             Modules::macOS::FSEVENTS, true, 2, 180,
-            "Filesystem events database"
+            "Filesystem events database (/.fseventsd)"
         ));
         profile.modules.push_back(createModuleConfig(
             Modules::macOS::BROWSER_HISTORY, true, 3, 180,
@@ -290,7 +306,7 @@ CollectionProfile ModuleProfileManager::getDeepProfile(OperatingSystem os) {
         ));
         profile.modules.push_back(createModuleConfig(
             Modules::macOS::PERSISTENCE, true, 6, 180,
-            "Launch agents, daemons, and cron"
+            "Launch agents, daemons, login items"
         ));
         profile.modules.push_back(createModuleConfig(
             Modules::macOS::SYSINFO, true, 7, 120,

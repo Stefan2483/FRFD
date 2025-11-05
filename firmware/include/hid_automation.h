@@ -163,6 +163,10 @@ public:
     bool executeWindowsPrefetch();
     bool executeWindowsScheduledTasks();
     bool executeWindowsServices();
+    bool executeWindowsRegistry();
+    bool executeWindowsBrowserHistory();
+    bool executeWindowsMFT();
+    bool executeWindowsUserFiles();
 
     // Linux Automation
     bool executeLinuxSystemInfo();
@@ -170,10 +174,17 @@ public:
     bool executeLinuxNetstat();
     bool executeLinuxKernelModules();
     bool executeLinuxPersistence();
+    bool executeLinuxShellHistory();
+    bool executeLinuxSSHConfig();
+    bool executeLinuxBrowserHistory();
+    bool executeLinuxUserAccounts();
 
     // macOS Automation
     bool executeMacOSSystemInfo();
     bool executeMacOSPersistence();
+    bool executeMacOSUnifiedLogs();
+    bool executeMacOSFSEvents();
+    bool executeMacOSBrowserHistory();
 
     // Forensic Logging
     void logAction(const String& action_type, const String& command, const String& result);

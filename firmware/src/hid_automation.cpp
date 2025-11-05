@@ -655,6 +655,132 @@ bool HIDAutomation::executeWindowsServices() {
     return true;
 }
 
+bool HIDAutomation::executeWindowsRegistry() {
+    logAction("WIN_REGISTRY", "Collecting Windows Registry hives", "STARTED");
+
+    // Create registry directory
+    typeCommand("New-Item -ItemType Directory -Force -Path .\\registry", true);
+    delay(500);
+
+    // Export HKLM\SAM (Security Account Manager)
+    typeCommand("reg save HKLM\\SAM .\\registry\\SAM.hive /y", true);
+    delay(3000);
+    logAction("WIN_REGISTRY", "SAM hive exported", "SUCCESS");
+
+    // Export HKLM\SYSTEM
+    typeCommand("reg save HKLM\\SYSTEM .\\registry\\SYSTEM.hive /y", true);
+    delay(3000);
+    logAction("WIN_REGISTRY", "SYSTEM hive exported", "SUCCESS");
+
+    // Export HKLM\SOFTWARE
+    typeCommand("reg save HKLM\\SOFTWARE .\\registry\\SOFTWARE.hive /y", true);
+    delay(5000);  // SOFTWARE hive is larger
+    logAction("WIN_REGISTRY", "SOFTWARE hive exported", "SUCCESS");
+
+    // Export HKLM\SECURITY
+    typeCommand("reg save HKLM\\SECURITY .\\registry\\SECURITY.hive /y", true);
+    delay(2000);
+    logAction("WIN_REGISTRY", "SECURITY hive exported", "SUCCESS");
+
+    // Export current user registry (NTUSER.DAT)
+    typeCommand("reg save HKCU .\\registry\\NTUSER.hive /y", true);
+    delay(3000);
+    logAction("WIN_REGISTRY", "NTUSER hive exported", "SUCCESS");
+
+    logAction("WIN_REGISTRY", "All registry hives collected successfully", "SUCCESS");
+    return true;
+}
+
+bool HIDAutomation::executeWindowsBrowserHistory() {
+    logAction("WIN_BROWSER", "Collecting browser history", "STARTED");
+
+    // Create browser directory
+    typeCommand("New-Item -ItemType Directory -Force -Path .\\browser", true);
+    delay(500);
+
+    // Chrome history (copy locked SQLite database)
+    String chrome_cmd = "$env:LOCALAPPDATA + '\\Google\\Chrome\\User Data\\Default\\History'";
+    typeCommand("if (Test-Path ($chromePath = " + chrome_cmd + ")) { Copy-Item $chromePath -Destination .\\browser\\Chrome_History.sqlite -Force }", true);
+    delay(2000);
+    logAction("WIN_BROWSER", "Chrome history collected", "SUCCESS");
+
+    // Firefox history (copy places.sqlite)
+    typeCommand("$firefoxProfile = Get-ChildItem \"$env:APPDATA\\Mozilla\\Firefox\\Profiles\" -Filter '*.default*' | Select-Object -First 1", true);
+    delay(1000);
+    typeCommand("if ($firefoxProfile) { Copy-Item \"$($firefoxProfile.FullName)\\places.sqlite\" -Destination .\\browser\\Firefox_History.sqlite -Force }", true);
+    delay(2000);
+    logAction("WIN_BROWSER", "Firefox history collected", "SUCCESS");
+
+    // Edge history (Chromium-based)
+    String edge_cmd = "$env:LOCALAPPDATA + '\\Microsoft\\Edge\\User Data\\Default\\History'";
+    typeCommand("if (Test-Path ($edgePath = " + edge_cmd + ")) { Copy-Item $edgePath -Destination .\\browser\\Edge_History.sqlite -Force }", true);
+    delay(2000);
+    logAction("WIN_BROWSER", "Edge history collected", "SUCCESS");
+
+    logAction("WIN_BROWSER", "Browser history collection complete", "SUCCESS");
+    return true;
+}
+
+bool HIDAutomation::executeWindowsMFT() {
+    logAction("WIN_MFT", "Collecting MFT and timeline artifacts", "STARTED");
+
+    // Create mft directory
+    typeCommand("New-Item -ItemType Directory -Force -Path .\\mft", true);
+    delay(500);
+
+    // Export USN Journal (Update Sequence Number Journal)
+    typeCommand("fsutil usn readjournal C: csv > .\\mft\\usn_journal.csv", true);
+    delay(10000);  // USN journal can be large
+    logAction("WIN_MFT", "USN Journal exported", "SUCCESS");
+
+    // Get volume information
+    typeCommand("fsutil fsinfo volumeinfo C: > .\\mft\\volume_info.txt", true);
+    delay(1000);
+
+    // Get NTFS information
+    typeCommand("fsutil fsinfo ntfsinfo C: > .\\mft\\ntfs_info.txt", true);
+    delay(1000);
+
+    // Note: Full $MFT extraction requires specialized tools (RawCopy)
+    // For now, we collect USN Journal and timeline metadata
+    typeCommand("@'\r\nNOTE: Full MFT extraction requires RawCopy.exe or similar tools.\r\nUSN Journal provides timeline of file system changes.\r\n'@ | Out-File .\\mft\\README.txt", true);
+    delay(500);
+
+    logAction("WIN_MFT", "MFT and timeline artifacts collected", "SUCCESS");
+    return true;
+}
+
+bool HIDAutomation::executeWindowsUserFiles() {
+    logAction("WIN_USERFILES", "Collecting user file metadata", "STARTED");
+
+    // Create userfiles directory
+    typeCommand("New-Item -ItemType Directory -Force -Path .\\userfiles", true);
+    delay(500);
+
+    // Get metadata from Downloads folder
+    typeCommand("Get-ChildItem \"$env:USERPROFILE\\Downloads\" -Recurse -ErrorAction SilentlyContinue | Select-Object FullName, Length, CreationTime, LastWriteTime, LastAccessTime | Export-Csv .\\userfiles\\Downloads_metadata.csv -NoTypeInformation", true);
+    delay(3000);
+    logAction("WIN_USERFILES", "Downloads metadata collected", "SUCCESS");
+
+    // Get metadata from Desktop
+    typeCommand("Get-ChildItem \"$env:USERPROFILE\\Desktop\" -Recurse -ErrorAction SilentlyContinue | Select-Object FullName, Length, CreationTime, LastWriteTime, LastAccessTime | Export-Csv .\\userfiles\\Desktop_metadata.csv -NoTypeInformation", true);
+    delay(2000);
+    logAction("WIN_USERFILES", "Desktop metadata collected", "SUCCESS");
+
+    // Get metadata from Documents
+    typeCommand("Get-ChildItem \"$env:USERPROFILE\\Documents\" -Recurse -ErrorAction SilentlyContinue | Select-Object FullName, Length, CreationTime, LastWriteTime, LastAccessTime | Export-Csv .\\userfiles\\Documents_metadata.csv -NoTypeInformation", true);
+    delay(3000);
+    logAction("WIN_USERFILES", "Documents metadata collected", "SUCCESS");
+
+    // Get Recent items
+    typeCommand("Get-ChildItem \"$env:APPDATA\\Microsoft\\Windows\\Recent\" -ErrorAction SilentlyContinue | Select-Object FullName, CreationTime, LastWriteTime | Export-Csv .\\userfiles\\Recent_items.csv -NoTypeInformation", true);
+    delay(1000);
+    logAction("WIN_USERFILES", "Recent items collected", "SUCCESS");
+
+    logAction("WIN_USERFILES", "User file metadata collection complete", "SUCCESS");
+    return true;
+}
+
 bool HIDAutomation::automateLinuxForensics() {
     logAction("LNX_AUTO_START", "Starting Linux forensics automation", "STARTED");
 
@@ -822,6 +948,136 @@ bool HIDAutomation::executeLinuxPersistence() {
     return true;
 }
 
+bool HIDAutomation::executeLinuxShellHistory() {
+    logAction("LNX_SHELL_HISTORY", "Collecting shell history for all users", "STARTED");
+
+    typeCommand("mkdir -p shell_history", true);
+    delay(300);
+
+    // Current user's bash history
+    typeCommand("if [ -f ~/.bash_history ]; then cp ~/.bash_history shell_history/bash_history_$(whoami).txt; fi", true);
+    delay(500);
+
+    // Current user's zsh history
+    typeCommand("if [ -f ~/.zsh_history ]; then cp ~/.zsh_history shell_history/zsh_history_$(whoami).txt; fi", true);
+    delay(500);
+
+    // Collect history for all users (requires root)
+    typeCommand("for user_home in /home/*; do user=$(basename $user_home); if [ -f $user_home/.bash_history ]; then sudo cp $user_home/.bash_history shell_history/bash_history_$user.txt 2>/dev/null; fi; done", true);
+    delay(2000);
+
+    typeCommand("for user_home in /home/*; do user=$(basename $user_home); if [ -f $user_home/.zsh_history ]; then sudo cp $user_home/.zsh_history shell_history/zsh_history_$user.txt 2>/dev/null; fi; done", true);
+    delay(2000);
+
+    // Root user history
+    typeCommand("sudo cp /root/.bash_history shell_history/bash_history_root.txt 2>/dev/null", true);
+    delay(500);
+
+    logAction("LNX_SHELL_HISTORY", "Shell history collection complete", "SUCCESS");
+    return true;
+}
+
+bool HIDAutomation::executeLinuxSSHConfig() {
+    logAction("LNX_SSH", "Collecting SSH configurations and keys", "STARTED");
+
+    typeCommand("mkdir -p ssh_config", true);
+    delay(300);
+
+    // System-wide SSH config
+    typeCommand("sudo cp /etc/ssh/sshd_config ssh_config/sshd_config.txt 2>/dev/null", true);
+    delay(500);
+
+    typeCommand("sudo cp /etc/ssh/ssh_config ssh_config/ssh_config.txt 2>/dev/null", true);
+    delay(500);
+
+    // Current user's SSH config
+    typeCommand("if [ -d ~/.ssh ]; then cp ~/.ssh/config ssh_config/user_ssh_config.txt 2>/dev/null; fi", true);
+    delay(300);
+
+    // Authorized keys (current user)
+    typeCommand("if [ -f ~/.ssh/authorized_keys ]; then cp ~/.ssh/authorized_keys ssh_config/authorized_keys_$(whoami).txt; fi", true);
+    delay(300);
+
+    // Known hosts (current user)
+    typeCommand("if [ -f ~/.ssh/known_hosts ]; then cp ~/.ssh/known_hosts ssh_config/known_hosts_$(whoami).txt; fi", true);
+    delay(300);
+
+    // Public keys (current user)
+    typeCommand("if [ -d ~/.ssh ]; then find ~/.ssh -name '*.pub' -exec cp {} ssh_config/ \\; 2>/dev/null; fi", true);
+    delay(500);
+
+    // List SSH keys for all users (metadata only, not private keys)
+    typeCommand("for user_home in /home/*; do user=$(basename $user_home); if [ -d $user_home/.ssh ]; then echo \"User: $user\" >> ssh_config/ssh_keys_inventory.txt; ls -la $user_home/.ssh >> ssh_config/ssh_keys_inventory.txt 2>/dev/null; fi; done", true);
+    delay(2000);
+
+    logAction("LNX_SSH", "SSH configuration collection complete", "SUCCESS");
+    return true;
+}
+
+bool HIDAutomation::executeLinuxBrowserHistory() {
+    logAction("LNX_BROWSER", "Collecting browser history", "STARTED");
+
+    typeCommand("mkdir -p browser", true);
+    delay(300);
+
+    // Firefox history (places.sqlite)
+    typeCommand("if [ -d ~/.mozilla/firefox ]; then find ~/.mozilla/firefox -name 'places.sqlite' -exec cp {} browser/firefox_history_$(whoami).sqlite \\; 2>/dev/null; fi", true);
+    delay(1000);
+
+    // Chrome history
+    typeCommand("if [ -f ~/.config/google-chrome/Default/History ]; then cp ~/.config/google-chrome/Default/History browser/chrome_history_$(whoami).sqlite; fi", true);
+    delay(1000);
+
+    // Chromium history
+    typeCommand("if [ -f ~/.config/chromium/Default/History ]; then cp ~/.config/chromium/Default/History browser/chromium_history_$(whoami).sqlite; fi", true);
+    delay(1000);
+
+    // Collect browser history for all users (metadata)
+    typeCommand("for user_home in /home/*; do user=$(basename $user_home); echo \"User: $user\" >> browser/browser_inventory.txt; find $user_home/.mozilla $user_home/.config/google-chrome $user_home/.config/chromium -name 'places.sqlite' -o -name 'History' 2>/dev/null | head -20 >> browser/browser_inventory.txt; done", true);
+    delay(2000);
+
+    logAction("LNX_BROWSER", "Browser history collection complete", "SUCCESS");
+    return true;
+}
+
+bool HIDAutomation::executeLinuxUserAccounts() {
+    logAction("LNX_USERS", "Collecting user account information", "STARTED");
+
+    typeCommand("mkdir -p user_accounts", true);
+    delay(300);
+
+    // /etc/passwd (user accounts)
+    typeCommand("sudo cp /etc/passwd user_accounts/passwd.txt 2>/dev/null", true);
+    delay(300);
+
+    // /etc/shadow (password hashes - requires root)
+    typeCommand("sudo cp /etc/shadow user_accounts/shadow.txt 2>/dev/null", true);
+    delay(300);
+
+    // /etc/group (groups)
+    typeCommand("sudo cp /etc/group user_accounts/group.txt 2>/dev/null", true);
+    delay(300);
+
+    // /etc/sudoers (sudo permissions)
+    typeCommand("sudo cp /etc/sudoers user_accounts/sudoers.txt 2>/dev/null", true);
+    delay(300);
+
+    // Last logged in users
+    typeCommand("last -a > user_accounts/last_logins.txt 2>&1", true);
+    delay(500);
+
+    // Currently logged in users
+    typeCommand("w > user_accounts/current_users.txt 2>&1", true);
+    delay(300);
+
+    // User login history
+    typeCommand("lastlog > user_accounts/lastlog.txt 2>&1", true);
+    delay(500);
+
+    logAction("LNX_USERS", "User account information collected", "SUCCESS");
+    return true;
+}
+
 bool HIDAutomation::automateMacOSForensics() {
     logAction("MAC_AUTO_START", "Starting macOS forensics automation", "STARTED");
 
@@ -915,6 +1171,88 @@ bool HIDAutomation::executeMacOSPersistence() {
     delay(1000);
 
     logAction("MAC_PERSIST", "Persistence check complete", "SUCCESS");
+    return true;
+}
+
+bool HIDAutomation::executeMacOSUnifiedLogs() {
+    logAction("MAC_UNIFIED_LOGS", "Collecting macOS Unified Logs", "STARTED");
+
+    typeCommand("mkdir -p unified_logs", true);
+    delay(300);
+
+    // Last 24 hours of logs
+    typeCommand("log show --predicate 'eventMessage contains \"error\" OR eventMessage contains \"fail\"' --info --last 24h > unified_logs/errors_last_24h.txt 2>&1", true);
+    delay(10000);  // Unified logs can be large
+    logAction("MAC_UNIFIED_LOGS", "Error logs collected", "SUCCESS");
+
+    // Security-related logs
+    typeCommand("log show --predicate 'subsystem == \"com.apple.securityd\"' --info --last 7d > unified_logs/security_last_7d.txt 2>&1", true);
+    delay(8000);
+    logAction("MAC_UNIFIED_LOGS", "Security logs collected", "SUCCESS");
+
+    // Authentication logs
+    typeCommand("log show --predicate 'process == \"loginwindow\" OR process == \"sudo\"' --info --last 7d > unified_logs/auth_last_7d.txt 2>&1", true);
+    delay(5000);
+    logAction("MAC_UNIFIED_LOGS", "Authentication logs collected", "SUCCESS");
+
+    // Network-related logs
+    typeCommand("log show --predicate 'subsystem contains \"network\"' --info --last 24h > unified_logs/network_last_24h.txt 2>&1", true);
+    delay(5000);
+    logAction("MAC_UNIFIED_LOGS", "Network logs collected", "SUCCESS");
+
+    logAction("MAC_UNIFIED_LOGS", "Unified logs collection complete", "SUCCESS");
+    return true;
+}
+
+bool HIDAutomation::executeMacOSFSEvents() {
+    logAction("MAC_FSEVENTS", "Collecting FSEvents database", "STARTED");
+
+    typeCommand("mkdir -p fsevents", true);
+    delay(300);
+
+    // FSEvents database (requires root)
+    typeCommand("sudo cp -R /.fseventsd fsevents/fseventsd_backup 2>&1", true);
+    delay(5000);  // FSEvents can be large
+    logAction("MAC_FSEVENTS", "FSEvents database copied", "SUCCESS");
+
+    // Get FSEvents metadata
+    typeCommand("sudo ls -la /.fseventsd > fsevents/fsevents_metadata.txt 2>&1", true);
+    delay(500);
+
+    // Note about FSEvents analysis
+    typeCommand("echo 'FSEvents database collected. Use FSEventsParser or similar tools for analysis.' > fsevents/README.txt", true);
+    delay(300);
+
+    logAction("MAC_FSEVENTS", "FSEvents collection complete", "SUCCESS");
+    return true;
+}
+
+bool HIDAutomation::executeMacOSBrowserHistory() {
+    logAction("MAC_BROWSER", "Collecting macOS browser history", "STARTED");
+
+    typeCommand("mkdir -p browser", true);
+    delay(300);
+
+    // Safari history
+    typeCommand("if [ -f ~/Library/Safari/History.db ]; then cp ~/Library/Safari/History.db browser/Safari_History.db; fi", true);
+    delay(1000);
+    logAction("MAC_BROWSER", "Safari history collected", "SUCCESS");
+
+    // Safari downloads
+    typeCommand("if [ -f ~/Library/Safari/Downloads.plist ]; then cp ~/Library/Safari/Downloads.plist browser/Safari_Downloads.plist; fi", true);
+    delay(500);
+
+    // Chrome history
+    typeCommand("if [ -f ~/Library/Application\\ Support/Google/Chrome/Default/History ]; then cp ~/Library/Application\\ Support/Google/Chrome/Default/History browser/Chrome_History.sqlite; fi", true);
+    delay(1000);
+    logAction("MAC_BROWSER", "Chrome history collected", "SUCCESS");
+
+    // Firefox history
+    typeCommand("firefox_profile=$(find ~/Library/Application\\ Support/Firefox/Profiles -name '*.default*' | head -1) && if [ -f \"$firefox_profile/places.sqlite\" ]; then cp \"$firefox_profile/places.sqlite\" browser/Firefox_History.sqlite; fi", true);
+    delay(1000);
+    logAction("MAC_BROWSER", "Firefox history collected", "SUCCESS");
+
+    logAction("MAC_BROWSER", "Browser history collection complete", "SUCCESS");
     return true;
 }
 
