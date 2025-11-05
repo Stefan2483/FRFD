@@ -236,6 +236,30 @@ CollectionProfile ModuleProfileManager::getDeepProfile(OperatingSystem os) {
             Modules::Windows::RECYCLE_BIN, true, 12, 120,
             "Recycle Bin contents"
         ));
+        profile.modules.push_back(createModuleConfig(
+            Modules::Windows::SHIMCACHE, true, 13, 60,
+            "ShimCache (AppCompatCache) execution artifacts"
+        ));
+        profile.modules.push_back(createModuleConfig(
+            Modules::Windows::AMCACHE, true, 14, 60,
+            "AmCache and BAM execution history"
+        ));
+        profile.modules.push_back(createModuleConfig(
+            Modules::Windows::JUMPLISTS, true, 15, 90,
+            "Jump Lists (recent file access)"
+        ));
+        profile.modules.push_back(createModuleConfig(
+            Modules::Windows::WMI, true, 16, 90,
+            "WMI persistence mechanisms"
+        ));
+        profile.modules.push_back(createModuleConfig(
+            Modules::Windows::USB_HISTORY, true, 17, 60,
+            "USB device connection history"
+        ));
+        profile.modules.push_back(createModuleConfig(
+            Modules::Windows::PS_HISTORY, true, 18, 90,
+            "PowerShell command history and logs"
+        ));
     }
 
     if (os == OS_LINUX || os == OS_UNKNOWN) {
@@ -280,6 +304,18 @@ CollectionProfile ModuleProfileManager::getDeepProfile(OperatingSystem os) {
             Modules::Linux::KERNEL_MODULES, true, 10, 60,
             "Kernel modules"
         ));
+        profile.modules.push_back(createModuleConfig(
+            Modules::Linux::SYSTEMD_JOURNAL, true, 11, 180,
+            "systemd journal logs (comprehensive)"
+        ));
+        profile.modules.push_back(createModuleConfig(
+            Modules::Linux::FIREWALL, true, 12, 60,
+            "Firewall rules (iptables, ufw, firewalld)"
+        ));
+        profile.modules.push_back(createModuleConfig(
+            Modules::Linux::CRON, true, 13, 90,
+            "Cron jobs and scheduled tasks"
+        ));
     }
 
     if (os == OS_MACOS || os == OS_UNKNOWN) {
@@ -311,6 +347,18 @@ CollectionProfile ModuleProfileManager::getDeepProfile(OperatingSystem os) {
         profile.modules.push_back(createModuleConfig(
             Modules::macOS::SYSINFO, true, 7, 120,
             "System information"
+        ));
+        profile.modules.push_back(createModuleConfig(
+            Modules::macOS::QUARANTINE, true, 8, 90,
+            "Quarantine database (download tracking)"
+        ));
+        profile.modules.push_back(createModuleConfig(
+            Modules::macOS::INSTALL_HISTORY, true, 9, 90,
+            "Installation history and package managers"
+        ));
+        profile.modules.push_back(createModuleConfig(
+            Modules::macOS::KEYCHAIN, true, 10, 90,
+            "Keychain metadata (certificates, identities)"
         ));
     }
 
