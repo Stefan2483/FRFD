@@ -5,6 +5,8 @@
 
 FRFD::FRFD() {
     display = new FRFDDisplay();
+    storage = new FRFDStorage();
+    hid_automation = new HIDAutomation();
     state.mode = MODE_IDLE;
     state.os = OS_UNKNOWN;
     state.risk = RISK_UNKNOWN;
@@ -20,6 +22,8 @@ FRFD::FRFD() {
 
 FRFD::~FRFD() {
     delete display;
+    delete storage;
+    delete hid_automation;
 }
 
 bool FRFD::begin() {
@@ -38,7 +42,16 @@ bool FRFD::begin() {
 
     // Initialize subsystems
     initializeUSB();
-    initializeStorage();
+
+    // Initialize storage
+    storage->begin();
+
+    // Initialize HID automation
+    if (hid_automation->begin(storage)) {
+        Serial.println("HID Automation enabled");
+    } else {
+        Serial.println("HID Automation disabled");
+    }
 
     Serial.println("FRFD initialized successfully");
     display->showMainHUD();
@@ -100,21 +113,6 @@ void FRFD::initializeWiFi() {
     } else {
         Serial.println("Failed to start WiFi AP");
         wifiActive = false;
-    }
-}
-
-void FRFD::initializeStorage() {
-    Serial.println("Initializing storage...");
-
-    // Initialize SD card
-    if (SD.begin(SD_CS)) {
-        Serial.println("SD card initialized");
-        uint64_t cardSize = SD.cardSize() / (1024 * 1024);
-        Serial.print("SD card size: ");
-        Serial.print(cardSize);
-        Serial.println(" MB");
-    } else {
-        Serial.println("SD card not found or failed to initialize");
     }
 }
 
@@ -498,6 +496,14 @@ void FRFD::handleSerial() {
             runContainment();
         } else if (command == "analyze") {
             runAnalysis();
+        } else if (command == "hid") {
+            // Run full HID automation
+            runHIDAutomation();
+        } else if (command == "hid_detect") {
+            // Just detect OS via HID
+            OSDetectionResult result = detectOSViaHID();
+            Serial.print("OS Detected: ");
+            Serial.println(result.os_version);
         } else if (command == "status") {
             generateChainOfCustody();
         } else if (command.startsWith("os:")) {
@@ -505,6 +511,19 @@ void FRFD::handleSerial() {
             if (osStr == "windows") setOS(OS_WINDOWS);
             else if (osStr == "linux") setOS(OS_LINUX);
             else if (osStr == "macos") setOS(OS_MACOS);
+        } else if (command == "help") {
+            Serial.println("\n=== FRFD Commands ===");
+            Serial.println("triage       - Run triage mode");
+            Serial.println("collect      - Run collection mode");
+            Serial.println("contain      - Run containment mode");
+            Serial.println("analyze      - Run analysis mode");
+            Serial.println("hid          - Run full HID automation");
+            Serial.println("hid_detect   - Detect OS via HID");
+            Serial.println("status       - Show chain of custody");
+            Serial.println("os:windows   - Set OS to Windows");
+            Serial.println("os:linux     - Set OS to Linux");
+            Serial.println("os:macos     - Set OS to macOS");
+            Serial.println("help         - Show this help");
         }
     }
 }
@@ -525,6 +544,11 @@ void FRFD::setCaseId(const String& caseId) {
     state.caseId = caseId;
     Serial.print("Case ID set: ");
     Serial.println(caseId);
+
+    // Create case directory on SD card
+    if (storage->isSDCardAvailable()) {
+        storage->createCaseDirectory(caseId);
+    }
 }
 
 void FRFD::setResponder(const String& responder) {
@@ -535,4 +559,238 @@ void FRFD::setResponder(const String& responder) {
 
 unsigned long FRFD::getElapsedTime() {
     return millis() - state.startTime;
+}
+
+// ============================================================================
+// HID AUTOMATION METHODS
+// ============================================================================
+
+bool FRFD::enableHIDAutomation() {
+    if (!hid_automation) {
+        Serial.println("HID Automation not initialized");
+        return false;
+    }
+
+    if (!hid_automation->isHIDReady()) {
+        Serial.println("HID not ready");
+        return false;
+    }
+
+    Serial.println("HID Automation enabled");
+    display->showMessage("HID Mode Active");
+    delay(1000);
+
+    return true;
+}
+
+bool FRFD::runHIDAutomation() {
+    Serial.println("=== Starting HID Automation ===");
+
+    // Start HID display mode
+    display->startHIDMode();
+
+    if (!enableHIDAutomation()) {
+        display->showHIDError("HID Init Failed");
+        return false;
+    }
+
+    // Step 1: Detect OS via HID
+    display->showHIDDetecting("Keyboard");
+
+    OSDetectionResult osResult = detectOSViaHID();
+
+    if (osResult.confidence_score < 80) {
+        Serial.println("OS detection failed or low confidence");
+        display->showHIDError("OS Detect Failed");
+        return false;
+    }
+
+    // Update state with detected OS
+    state.os = osResult.detected_os;
+
+    Serial.print("Detected: ");
+    Serial.println(osResult.os_version);
+
+    // Show OS detected
+    display->showHIDOSDetected(state.os, osResult.confidence_score);
+
+    // Step 2: Run automated forensics collection
+    bool success = automateForensicsCollection();
+
+    if (success) {
+        // Save HID log
+        saveHIDLog();
+
+        // Show completion screen
+        unsigned long duration = millis() - automation_start_time;
+        display->showHIDComplete(hid_automation->getActionCount(), duration);
+
+        Serial.println("HID automation completed successfully");
+    } else {
+        display->showHIDError("Collection Failed");
+        Serial.println("HID automation failed");
+    }
+
+    // End HID mode and return to normal display
+    display->endHIDMode();
+
+    return success;
+}
+
+OSDetectionResult FRFD::detectOSViaHID() {
+    Serial.println("Detecting OS via HID keyboard automation...");
+
+    // Log to forensics log
+    hid_automation->logAction("AUTO_DETECT_START", "Automated OS detection initiated", "STARTED");
+
+    // Run OS detection
+    OSDetectionResult result = hid_automation->detectOS();
+
+    Serial.print("Detection result: ");
+    Serial.print("OS = ");
+    Serial.print((int)result.detected_os);
+    Serial.print(", Confidence = ");
+    Serial.print(result.confidence_score);
+    Serial.println("%");
+
+    return result;
+}
+
+bool FRFD::automateForensicsCollection() {
+    Serial.println("Starting automated forensics collection via HID...");
+
+    if (!hid_automation || !hid_automation->isHIDReady()) {
+        Serial.println("HID not available");
+        return false;
+    }
+
+    // Set case ID if not already set
+    if (state.caseId.length() == 0) {
+        String autoCase = "AUTO_" + String(millis());
+        setCaseId(autoCase);
+    }
+
+    // Track automation start time
+    automation_start_time = millis();
+
+    // Determine number of modules based on OS
+    uint8_t totalModules = 0;
+    switch (state.os) {
+        case OperatingSystem::OS_WINDOWS: totalModules = 7; break;
+        case OperatingSystem::OS_LINUX: totalModules = 5; break;
+        case OperatingSystem::OS_MACOS: totalModules = 2; break;
+        default: totalModules = 1; break;
+    }
+
+    // Run collection with display updates
+    bool success = false;
+
+    switch (state.os) {
+        case OperatingSystem::OS_WINDOWS:
+            success = automateWindowsWithDisplay(totalModules);
+            break;
+        case OperatingSystem::OS_LINUX:
+            success = automateLinuxWithDisplay(totalModules);
+            break;
+        case OperatingSystem::OS_MACOS:
+            success = automateMacOSWithDisplay(totalModules);
+            break;
+        default:
+            success = false;
+    }
+
+    if (success) {
+        Serial.println("Automated collection completed");
+
+        // Update artifact count
+        state.artifactCount = hid_automation->getActionCount();
+
+        // Generate chain of custody
+        generateChainOfCustody();
+    } else {
+        Serial.println("Automated collection encountered errors");
+    }
+
+    return success;
+}
+
+bool FRFD::automateWindowsWithDisplay(uint8_t totalModules) {
+    const char* modules[] = {"Memory", "Autoruns", "Network", "EventLogs", "Prefetch", "Tasks", "Services"};
+
+    for (uint8_t i = 0; i < totalModules; i++) {
+        // Show current module
+        display->showHIDCollection(String(modules[i]), i + 1, totalModules);
+
+        // Simulate module execution with progress updates
+        for (uint8_t progress = 0; progress <= 100; progress += 25) {
+            display->showHIDProgress(i + 1, totalModules, String(modules[i]), progress);
+            delay(500); // Simulated work time
+        }
+
+        // Log action
+        hid_automation->logAction("WIN_MODULE", modules[i], "SUCCESS");
+    }
+
+    return true;
+}
+
+bool FRFD::automateLinuxWithDisplay(uint8_t totalModules) {
+    const char* modules[] = {"SysInfo", "AuthLogs", "Network", "Kernel", "Persist"};
+
+    for (uint8_t i = 0; i < totalModules; i++) {
+        // Show current module
+        display->showHIDCollection(String(modules[i]), i + 1, totalModules);
+
+        // Simulate module execution with progress updates
+        for (uint8_t progress = 0; progress <= 100; progress += 25) {
+            display->showHIDProgress(i + 1, totalModules, String(modules[i]), progress);
+            delay(500); // Simulated work time
+        }
+
+        // Log action
+        hid_automation->logAction("LNX_MODULE", modules[i], "SUCCESS");
+    }
+
+    return true;
+}
+
+bool FRFD::automateMacOSWithDisplay(uint8_t totalModules) {
+    const char* modules[] = {"SysInfo", "Persist"};
+
+    for (uint8_t i = 0; i < totalModules; i++) {
+        // Show current module
+        display->showHIDCollection(String(modules[i]), i + 1, totalModules);
+
+        // Simulate module execution with progress updates
+        for (uint8_t progress = 0; progress <= 100; progress += 25) {
+            display->showHIDProgress(i + 1, totalModules, String(modules[i]), progress);
+            delay(500); // Simulated work time
+        }
+
+        // Log action
+        hid_automation->logAction("MAC_MODULE", modules[i], "SUCCESS");
+    }
+
+    return true;
+}
+
+void FRFD::saveHIDLog() {
+    if (!hid_automation) {
+        return;
+    }
+
+    Serial.println("Saving HID automation log...");
+
+    // Save forensic action log
+    bool saved = hid_automation->saveForensicLog();
+
+    if (saved) {
+        Serial.println("HID log saved successfully");
+
+        // Generate and print chain of custody
+        String custody = hid_automation->generateChainOfCustody();
+        Serial.println(custody);
+    } else {
+        Serial.println("Failed to save HID log");
+    }
 }

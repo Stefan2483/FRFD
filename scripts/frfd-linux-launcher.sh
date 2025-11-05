@@ -225,6 +225,34 @@ run_full_collection() {
 
     collection_results+=("persistence:success")
 
+    # Kernel Modules Analysis
+    log_info "Analyzing kernel modules..."
+    if [ -f "$FORENSICS_DIR/system/kernel_modules.sh" ]; then
+        if bash "$FORENSICS_DIR/system/kernel_modules.sh" "$OUTPUT_PATH"; then
+            collection_results+=("kernel_modules:success")
+            log_success "Kernel modules analyzed"
+        else
+            collection_results+=("kernel_modules:failed")
+            log_warning "Kernel modules analysis failed"
+        fi
+    else
+        log_warning "Kernel modules script not found"
+    fi
+
+    # Comprehensive Persistence Check
+    log_info "Running comprehensive persistence check..."
+    if [ -f "$FORENSICS_DIR/persistence/persistence_check.sh" ]; then
+        if bash "$FORENSICS_DIR/persistence/persistence_check.sh" "$OUTPUT_PATH"; then
+            collection_results+=("persistence_check:success")
+            log_success "Persistence check complete"
+        else
+            collection_results+=("persistence_check:failed")
+            log_warning "Persistence check failed"
+        fi
+    else
+        log_warning "Persistence check script not found"
+    fi
+
     log_success "Full collection complete!"
 
     # Print summary

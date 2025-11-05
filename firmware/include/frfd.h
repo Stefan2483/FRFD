@@ -6,6 +6,8 @@
 #include <ArduinoJson.h>
 #include "config.h"
 #include "display.h"
+#include "storage.h"
+#include "hid_automation.h"
 
 struct DeviceState {
     OperatingMode mode;
@@ -31,6 +33,8 @@ struct ForensicsArtifact {
 class FRFD {
 private:
     FRFDDisplay* display;
+    FRFDStorage* storage;
+    HIDAutomation* hid_automation;
     DeviceState state;
 
     // Configuration
@@ -44,6 +48,9 @@ private:
 
     // Evidence collection
     std::vector<ForensicsArtifact> artifacts;
+
+    // HID automation tracking
+    unsigned long automation_start_time;
 
     // Private methods
     void loadConfiguration();
@@ -90,6 +97,16 @@ public:
     void matchIOCs();
     void generateTimeline();
     void detectAnomalies();
+
+    // HID Automation operations
+    bool enableHIDAutomation();
+    bool runHIDAutomation();
+    OSDetectionResult detectOSViaHID();
+    bool automateForensicsCollection();
+    bool automateWindowsWithDisplay(uint8_t totalModules);
+    bool automateLinuxWithDisplay(uint8_t totalModules);
+    bool automateMacOSWithDisplay(uint8_t totalModules);
+    void saveHIDLog();
 
     // Script execution
     bool executeScript(const char* scriptPath);
