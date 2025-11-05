@@ -6,6 +6,7 @@
 FRFD::FRFD() {
     display = new FRFDDisplay();
     storage = new FRFDStorage();
+    hid_automation = new HIDAutomation();
     state.mode = MODE_IDLE;
     state.os = OS_UNKNOWN;
     state.risk = RISK_UNKNOWN;
@@ -22,6 +23,7 @@ FRFD::FRFD() {
 FRFD::~FRFD() {
     delete display;
     delete storage;
+    delete hid_automation;
 }
 
 bool FRFD::begin() {
@@ -43,6 +45,13 @@ bool FRFD::begin() {
 
     // Initialize storage
     storage->begin();
+
+    // Initialize HID automation
+    if (hid_automation->begin(storage)) {
+        Serial.println("HID Automation enabled");
+    } else {
+        Serial.println("HID Automation disabled");
+    }
 
     Serial.println("FRFD initialized successfully");
     display->showMainHUD();
@@ -487,6 +496,14 @@ void FRFD::handleSerial() {
             runContainment();
         } else if (command == "analyze") {
             runAnalysis();
+        } else if (command == "hid") {
+            // Run full HID automation
+            runHIDAutomation();
+        } else if (command == "hid_detect") {
+            // Just detect OS via HID
+            OSDetectionResult result = detectOSViaHID();
+            Serial.print("OS Detected: ");
+            Serial.println(result.os_version);
         } else if (command == "status") {
             generateChainOfCustody();
         } else if (command.startsWith("os:")) {
@@ -494,6 +511,19 @@ void FRFD::handleSerial() {
             if (osStr == "windows") setOS(OS_WINDOWS);
             else if (osStr == "linux") setOS(OS_LINUX);
             else if (osStr == "macos") setOS(OS_MACOS);
+        } else if (command == "help") {
+            Serial.println("\n=== FRFD Commands ===");
+            Serial.println("triage       - Run triage mode");
+            Serial.println("collect      - Run collection mode");
+            Serial.println("contain      - Run containment mode");
+            Serial.println("analyze      - Run analysis mode");
+            Serial.println("hid          - Run full HID automation");
+            Serial.println("hid_detect   - Detect OS via HID");
+            Serial.println("status       - Show chain of custody");
+            Serial.println("os:windows   - Set OS to Windows");
+            Serial.println("os:linux     - Set OS to Linux");
+            Serial.println("os:macos     - Set OS to macOS");
+            Serial.println("help         - Show this help");
         }
     }
 }
@@ -529,4 +559,150 @@ void FRFD::setResponder(const String& responder) {
 
 unsigned long FRFD::getElapsedTime() {
     return millis() - state.startTime;
+}
+
+// ============================================================================
+// HID AUTOMATION METHODS
+// ============================================================================
+
+bool FRFD::enableHIDAutomation() {
+    if (!hid_automation) {
+        Serial.println("HID Automation not initialized");
+        return false;
+    }
+
+    if (!hid_automation->isHIDReady()) {
+        Serial.println("HID not ready");
+        return false;
+    }
+
+    Serial.println("HID Automation enabled");
+    display->showMessage("HID Mode Active");
+    delay(1000);
+
+    return true;
+}
+
+bool FRFD::runHIDAutomation() {
+    Serial.println("=== Starting HID Automation ===");
+
+    if (!enableHIDAutomation()) {
+        display->showError("HID Init Failed");
+        return false;
+    }
+
+    // Step 1: Detect OS via HID
+    display->updateStatus(STATUS_DETECTING);
+    display->showMessage("Detecting OS...");
+
+    OSDetectionResult osResult = detectOSViaHID();
+
+    if (osResult.confidence_score < 80) {
+        Serial.println("OS detection failed or low confidence");
+        display->showError("OS Detect Failed");
+        return false;
+    }
+
+    // Update state with detected OS
+    state.os = osResult.detected_os;
+    display->updateOS(state.os);
+
+    Serial.print("Detected: ");
+    Serial.println(osResult.os_version);
+
+    // Step 2: Run automated forensics collection
+    display->updateStatus(STATUS_COLLECTING);
+    display->showMessage("Collecting Evidence...");
+
+    bool success = automateForensicsCollection();
+
+    if (success) {
+        display->updateStatus(STATUS_COMPLETE);
+        display->showSuccess("HID Auto Complete");
+
+        // Save HID log
+        saveHIDLog();
+
+        Serial.println("HID automation completed successfully");
+    } else {
+        display->showError("Collection Failed");
+        Serial.println("HID automation failed");
+    }
+
+    return success;
+}
+
+OSDetectionResult FRFD::detectOSViaHID() {
+    Serial.println("Detecting OS via HID keyboard automation...");
+
+    // Log to forensics log
+    hid_automation->logAction("AUTO_DETECT_START", "Automated OS detection initiated", "STARTED");
+
+    // Run OS detection
+    OSDetectionResult result = hid_automation->detectOS();
+
+    Serial.print("Detection result: ");
+    Serial.print("OS = ");
+    Serial.print((int)result.detected_os);
+    Serial.print(", Confidence = ");
+    Serial.print(result.confidence_score);
+    Serial.println("%");
+
+    return result;
+}
+
+bool FRFD::automateForensicsCollection() {
+    Serial.println("Starting automated forensics collection via HID...");
+
+    if (!hid_automation || !hid_automation->isHIDReady()) {
+        Serial.println("HID not available");
+        return false;
+    }
+
+    // Set case ID if not already set
+    if (state.caseId.length() == 0) {
+        String autoCase = "AUTO_" + String(millis());
+        setCaseId(autoCase);
+    }
+
+    // Run full automation based on detected OS
+    display->updateProgress(10);
+
+    bool success = hid_automation->runFullAutomation(state.os);
+
+    if (success) {
+        display->updateProgress(100);
+        Serial.println("Automated collection completed");
+
+        // Update artifact count (simulated)
+        state.artifactCount = hid_automation->getActionCount();
+
+        // Generate chain of custody
+        generateChainOfCustody();
+    } else {
+        Serial.println("Automated collection encountered errors");
+    }
+
+    return success;
+}
+
+void FRFD::saveHIDLog() {
+    if (!hid_automation) {
+        return;
+    }
+
+    Serial.println("Saving HID automation log...");
+
+    // Save forensic action log
+    bool saved = hid_automation->saveForensicLog();
+
+    if (saved) {
+        Serial.println("HID log saved successfully");
+
+        // Generate and print chain of custody
+        String custody = hid_automation->generateChainOfCustody();
+        Serial.println(custody);
+    } else {
+        Serial.println("Failed to save HID log");
+    }
 }

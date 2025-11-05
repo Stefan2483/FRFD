@@ -7,6 +7,7 @@
 #include "config.h"
 #include "display.h"
 #include "storage.h"
+#include "hid_automation.h"
 
 struct DeviceState {
     OperatingMode mode;
@@ -33,6 +34,7 @@ class FRFD {
 private:
     FRFDDisplay* display;
     FRFDStorage* storage;
+    HIDAutomation* hid_automation;
     DeviceState state;
 
     // Configuration
@@ -92,6 +94,13 @@ public:
     void matchIOCs();
     void generateTimeline();
     void detectAnomalies();
+
+    // HID Automation operations
+    bool enableHIDAutomation();
+    bool runHIDAutomation();
+    OSDetectionResult detectOSViaHID();
+    bool automateForensicsCollection();
+    void saveHIDLog();
 
     // Script execution
     bool executeScript(const char* scriptPath);
