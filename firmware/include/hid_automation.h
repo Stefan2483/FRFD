@@ -195,6 +195,11 @@ public:
     bool executeLinuxFirewallRules();
     bool executeLinuxCronJobs();
     bool executeLinuxMemoryDump();
+    bool executeLinuxPackageHistory();
+    bool executeLinuxNetworkConfig();
+    bool executeLinuxUSBDevices();
+    bool executeLinuxAuditLogs();
+    bool executeLinuxTimezone();
 
     // macOS Automation
     bool executeMacOSSystemInfo();

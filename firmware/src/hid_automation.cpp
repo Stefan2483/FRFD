@@ -1621,6 +1621,200 @@ bool HIDAutomation::executeLinuxMemoryDump() {
     return true;
 }
 
+bool HIDAutomation::executeLinuxPackageHistory() {
+    logAction("LNX_PACKAGES", "Collecting package installation history", "STARTED");
+
+    typeCommand("mkdir -p packages", true);
+    delay(300);
+
+    // Debian/Ubuntu (dpkg/apt)
+    typeCommand("if command -v dpkg > /dev/null; then dpkg -l > packages/dpkg_installed.txt 2>&1; fi", true);
+    delay(1500);
+
+    typeCommand("if [ -f /var/log/dpkg.log ]; then sudo cp /var/log/dpkg.log* packages/ 2>/dev/null; fi", true);
+    delay(1000);
+
+    typeCommand("if [ -f /var/log/apt/history.log ]; then sudo cp /var/log/apt/history.log* packages/ 2>/dev/null; fi", true);
+    delay(1000);
+    logAction("LNX_PACKAGES", "Debian/Ubuntu package history collected", "SUCCESS");
+
+    // RedHat/CentOS (rpm/yum)
+    typeCommand("if command -v rpm > /dev/null; then rpm -qa --last > packages/rpm_installed.txt 2>&1; fi", true);
+    delay(1500);
+
+    typeCommand("if [ -f /var/log/yum.log ]; then sudo cp /var/log/yum.log packages/ 2>/dev/null; fi", true);
+    delay(1000);
+
+    typeCommand("if command -v dnf > /dev/null; then sudo cp /var/log/dnf*.log packages/ 2>/dev/null; fi", true);
+    delay(1000);
+    logAction("LNX_PACKAGES", "RedHat/CentOS package history collected", "SUCCESS");
+
+    // Arch Linux (pacman)
+    typeCommand("if [ -f /var/log/pacman.log ]; then sudo cp /var/log/pacman.log packages/ 2>/dev/null; fi", true);
+    delay(1000);
+
+    logAction("LNX_PACKAGES", "Package history collection complete", "SUCCESS");
+    return true;
+}
+
+bool HIDAutomation::executeLinuxNetworkConfig() {
+    logAction("LNX_NETCONFIG", "Collecting network configuration", "STARTED");
+
+    typeCommand("mkdir -p network_config", true);
+    delay(300);
+
+    // Network interfaces
+    typeCommand("ip addr show > network_config/ip_addr.txt 2>&1", true);
+    delay(500);
+
+    typeCommand("ifconfig -a > network_config/ifconfig.txt 2>&1", true);
+    delay(500);
+
+    // Routing tables
+    typeCommand("ip route show > network_config/ip_route.txt 2>&1", true);
+    delay(500);
+
+    typeCommand("route -n > network_config/route.txt 2>&1", true);
+    delay(500);
+    logAction("LNX_NETCONFIG", "Routing tables collected", "SUCCESS");
+
+    // Network configuration files
+    typeCommand("sudo cp /etc/network/interfaces network_config/ 2>/dev/null", true);
+    delay(300);
+
+    typeCommand("sudo cp -r /etc/NetworkManager/system-connections network_config/ 2>/dev/null", true);
+    delay(500);
+
+    typeCommand("sudo cp /etc/resolv.conf network_config/ 2>/dev/null", true);
+    delay(300);
+
+    typeCommand("sudo cp /etc/hosts network_config/ 2>/dev/null", true);
+    delay(300);
+    logAction("LNX_NETCONFIG", "Configuration files collected", "SUCCESS");
+
+    // Wireless info
+    typeCommand("iwconfig > network_config/wireless.txt 2>&1", true);
+    delay(500);
+
+    typeCommand("nmcli device wifi list > network_config/wifi_networks.txt 2>&1", true);
+    delay(1000);
+
+    logAction("LNX_NETCONFIG", "Network configuration collection complete", "SUCCESS");
+    return true;
+}
+
+bool HIDAutomation::executeLinuxUSBDevices() {
+    logAction("LNX_USB", "Collecting USB device history", "STARTED");
+
+    typeCommand("mkdir -p usb_devices", true);
+    delay(300);
+
+    // Current USB devices
+    typeCommand("lsusb -v > usb_devices/lsusb_verbose.txt 2>&1", true);
+    delay(2000);
+    logAction("LNX_USB", "Current USB devices listed", "SUCCESS");
+
+    // USB device history from logs
+    typeCommand("sudo grep -i usb /var/log/syslog* > usb_devices/usb_syslog.txt 2>/dev/null", true);
+    delay(2000);
+
+    typeCommand("sudo grep -i usb /var/log/kern.log* > usb_devices/usb_kernel.txt 2>/dev/null", true);
+    delay(2000);
+
+    typeCommand("sudo grep -i usb /var/log/messages* > usb_devices/usb_messages.txt 2>/dev/null", true);
+    delay(2000);
+
+    // USB authorization
+    typeCommand("find /sys/bus/usb/devices -name authorized -exec grep -H . {} \\; > usb_devices/usb_authorized.txt 2>&1", true);
+    delay(1000);
+
+    // USB device serial numbers
+    typeCommand("for dev in /sys/bus/usb/devices/*; do [ -f $dev/serial ] && echo \"$dev: $(cat $dev/serial)\"; done > usb_devices/usb_serials.txt 2>&1", true);
+    delay(1500);
+
+    logAction("LNX_USB", "USB device collection complete", "SUCCESS");
+    return true;
+}
+
+bool HIDAutomation::executeLinuxAuditLogs() {
+    logAction("LNX_AUDIT", "Collecting audit logs (auditd)", "STARTED");
+
+    typeCommand("mkdir -p audit_logs", true);
+    delay(300);
+
+    // Audit logs
+    typeCommand("sudo cp /var/log/audit/audit.log* audit_logs/ 2>/dev/null", true);
+    delay(2000);
+    logAction("LNX_AUDIT", "Audit logs copied", "SUCCESS");
+
+    // Audit rules
+    typeCommand("sudo auditctl -l > audit_logs/audit_rules.txt 2>&1", true);
+    delay(500);
+
+    // Audit status
+    typeCommand("sudo auditctl -s > audit_logs/audit_status.txt 2>&1", true);
+    delay(300);
+
+    // Parse common audit events
+    typeCommand("sudo ausearch -m LOGIN > audit_logs/login_events.txt 2>&1", true);
+    delay(1500);
+
+    typeCommand("sudo ausearch -m USER_AUTH > audit_logs/auth_events.txt 2>&1", true);
+    delay(1500);
+
+    typeCommand("sudo ausearch -m EXECVE > audit_logs/exec_events.txt 2>&1", true);
+    delay(2000);
+
+    typeCommand("sudo ausearch -m AVC > audit_logs/selinux_events.txt 2>&1", true);
+    delay(1500);
+
+    logAction("LNX_AUDIT", "Audit log collection complete", "SUCCESS");
+    return true;
+}
+
+bool HIDAutomation::executeLinuxTimezone() {
+    logAction("LNX_TIMEZONE", "Collecting timezone and time configuration", "STARTED");
+
+    typeCommand("mkdir -p timezone", true);
+    delay(300);
+
+    // Current time and timezone
+    typeCommand("date > timezone/current_time.txt 2>&1", true);
+    delay(300);
+
+    typeCommand("timedatectl > timezone/timedatectl.txt 2>&1", true);
+    delay(500);
+    logAction("LNX_TIMEZONE", "Timezone information collected", "SUCCESS");
+
+    // Timezone files
+    typeCommand("sudo cp /etc/timezone timezone/ 2>/dev/null", true);
+    delay(300);
+
+    typeCommand("sudo cp /etc/localtime timezone/ 2>/dev/null", true);
+    delay(300);
+
+    // NTP configuration
+    typeCommand("sudo cp /etc/ntp.conf timezone/ 2>/dev/null", true);
+    delay(300);
+
+    typeCommand("sudo cp /etc/systemd/timesyncd.conf timezone/ 2>/dev/null", true);
+    delay(300);
+
+    // NTP sync status
+    typeCommand("timedatectl show-timesync --all > timezone/ntp_sync.txt 2>&1", true);
+    delay(500);
+
+    typeCommand("ntpq -p > timezone/ntp_peers.txt 2>&1", true);
+    delay(500);
+
+    // Hardware clock
+    typeCommand("sudo hwclock --show > timezone/hwclock.txt 2>&1", true);
+    delay(500);
+
+    logAction("LNX_TIMEZONE", "Timezone collection complete", "SUCCESS");
+    return true;
+}
+
 bool HIDAutomation::automateMacOSForensics() {
     logAction("MAC_AUTO_START", "Starting macOS forensics automation", "STARTED");
 
