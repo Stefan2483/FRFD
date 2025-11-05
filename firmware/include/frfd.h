@@ -8,6 +8,8 @@
 #include "display.h"
 #include "storage.h"
 #include "hid_automation.h"
+#include "evidence_container.h"
+#include "wifi_manager.h"
 
 struct DeviceState {
     OperatingMode mode;
@@ -35,6 +37,8 @@ private:
     FRFDDisplay* display;
     FRFDStorage* storage;
     HIDAutomation* hid_automation;
+    EvidenceContainer* evidence_container;
+    WiFiManager* wifi_manager;
     DeviceState state;
 
     // Configuration
