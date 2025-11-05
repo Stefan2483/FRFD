@@ -3,10 +3,21 @@
 WiFiManager::WiFiManager(FRFDStorage* storagePtr) {
     storage = storagePtr;
     server = nullptr;
+    evidence_container = nullptr;
     apActive = false;
     apSSID = "";
     apPassword = "";
     currentProgress = 0;
+
+    // Initialize upload progress tracking
+    upload_progress.active = false;
+    upload_progress.filename = "";
+    upload_progress.artifact_type = "";
+    upload_progress.total_bytes = 0;
+    upload_progress.uploaded_bytes = 0;
+    upload_progress.start_time = 0;
+    upload_progress.speed_kbps = 0.0;
+    upload_progress.percent = 0;
 }
 
 WiFiManager::~WiFiManager() {
@@ -75,6 +86,10 @@ bool WiFiManager::startAP() {
     server->on("/files", HTTP_GET, [this]() { handleFiles(); });
     server->on("/download", HTTP_GET, [this]() { handleDownload(); });
     server->on("/config", HTTP_GET, [this]() { handleConfig(); });
+    server->on("/upload", HTTP_POST,
+        [this]() { server->send(200, "application/json", "{\"status\":\"success\"}"); },
+        [this]() { handleUpload(); }
+    );
     server->onNotFound([this]() { handleNotFound(); });
 
     server->begin();
@@ -122,6 +137,10 @@ void WiFiManager::setProgress(uint8_t progress) {
     currentProgress = progress;
 }
 
+void WiFiManager::setEvidenceContainer(EvidenceContainer* container) {
+    evidence_container = container;
+}
+
 String WiFiManager::getAPIP() {
     return WiFi.softAPIP().toString();
 }
@@ -132,6 +151,30 @@ String WiFiManager::getAPSSID() {
 
 uint8_t WiFiManager::getConnectedClients() {
     return WiFi.softAPgetStationNum();
+}
+
+bool WiFiManager::isUploadActive() {
+    return upload_progress.active;
+}
+
+String WiFiManager::getUploadFilename() {
+    return upload_progress.filename;
+}
+
+unsigned long WiFiManager::getUploadBytes() {
+    return upload_progress.uploaded_bytes;
+}
+
+unsigned long WiFiManager::getUploadTotal() {
+    return upload_progress.total_bytes;
+}
+
+uint8_t WiFiManager::getUploadPercent() {
+    return upload_progress.percent;
+}
+
+float WiFiManager::getUploadSpeed() {
+    return upload_progress.speed_kbps;
 }
 
 void WiFiManager::handleRoot() {
@@ -292,6 +335,18 @@ String WiFiManager::generateStatusJSON() {
         json += "\"sd_free_mb\":" + String(storage->getSDCardFree()) + ",";
     }
 
+    // Add upload progress
+    json += "\"upload\":{";
+    json += "\"active\":" + String(upload_progress.active ? "true" : "false") + ",";
+    if (upload_progress.active) {
+        json += "\"filename\":\"" + upload_progress.filename + "\",";
+        json += "\"type\":\"" + upload_progress.artifact_type + "\",";
+        json += "\"bytes\":" + String(upload_progress.uploaded_bytes) + ",";
+        json += "\"speed_kbps\":" + String(upload_progress.speed_kbps, 2) + ",";
+        json += "\"percent\":" + String(upload_progress.percent);
+    }
+    json += "},";
+
     json += "\"firmware\":\"" + String(FIRMWARE_VERSION) + "\"";
     json += "}";
 
@@ -450,6 +505,176 @@ void WiFiManager::handleConfig() {
 
 void WiFiManager::handleNotFound() {
     server->send(404, "text/plain", "404: Not Found");
+}
+
+void WiFiManager::handleUpload() {
+    static String currentArtifactType;
+    static String currentFilename;
+    static String currentSourcePath;
+    static std::vector<uint8_t> uploadBuffer;
+    static unsigned long uploadStartTime;
+
+    HTTPUpload& upload = server->upload();
+
+    if (upload.status == UPLOAD_FILE_START) {
+        // Initialize upload
+        uploadStartTime = millis();
+        currentFilename = upload.filename;
+        uploadBuffer.clear();
+
+        // Extract artifact type from form parameter
+        if (server->hasArg("type")) {
+            currentArtifactType = server->arg("type");
+        } else {
+            currentArtifactType = "unknown";
+        }
+
+        // Extract source path if provided
+        if (server->hasArg("source_path")) {
+            currentSourcePath = server->arg("source_path");
+        } else {
+            currentSourcePath = "";
+        }
+
+        // Initialize progress tracking
+        upload_progress.active = true;
+        upload_progress.filename = currentFilename;
+        upload_progress.artifact_type = currentArtifactType;
+        upload_progress.total_bytes = 0;  // Unknown until complete
+        upload_progress.uploaded_bytes = 0;
+        upload_progress.start_time = uploadStartTime;
+        upload_progress.speed_kbps = 0.0;
+        upload_progress.percent = 0;
+
+        Serial.printf("[WiFi] Upload started: %s (%s)\n",
+                     currentFilename.c_str(),
+                     currentArtifactType.c_str());
+
+    } else if (upload.status == UPLOAD_FILE_WRITE) {
+        // Append chunk to buffer
+        size_t oldSize = uploadBuffer.size();
+        uploadBuffer.resize(oldSize + upload.currentSize);
+        memcpy(&uploadBuffer[oldSize], upload.buf, upload.currentSize);
+
+        // Update progress tracking
+        upload_progress.uploaded_bytes = uploadBuffer.size();
+        unsigned long elapsed = millis() - uploadStartTime;
+        if (elapsed > 0) {
+            upload_progress.speed_kbps = (uploadBuffer.size() / 1024.0) / (elapsed / 1000.0);
+        }
+
+        // Estimate percent (if we knew total size, but we don't for chunked uploads)
+        // For now, just track that we're receiving data
+        upload_progress.percent = 0;  // Will be 100 when complete
+
+        // Update progress (every 10KB)
+        if (uploadBuffer.size() % 10240 == 0) {
+            Serial.printf("[WiFi] Received: %d bytes (%.2f KB/s)\n",
+                         uploadBuffer.size(),
+                         upload_progress.speed_kbps);
+        }
+
+    } else if (upload.status == UPLOAD_FILE_END) {
+        // Upload complete - save to evidence container
+        unsigned long uploadDuration = millis() - uploadStartTime;
+
+        Serial.printf("[WiFi] Upload complete: %s (%d bytes in %lu ms)\n",
+                     currentFilename.c_str(),
+                     uploadBuffer.size(),
+                     uploadDuration);
+
+        if (!evidence_container) {
+            Serial.println("[WiFi] ERROR: No evidence container available!");
+            server->send(500, "application/json",
+                        "{\"status\":\"error\",\"message\":\"No evidence container\"}");
+            uploadBuffer.clear();
+            return;
+        }
+
+        if (!evidence_container->isOpen()) {
+            Serial.println("[WiFi] ERROR: Evidence container not open!");
+            server->send(500, "application/json",
+                        "{\"status\":\"error\",\"message\":\"Evidence container not open\"}");
+            uploadBuffer.clear();
+            return;
+        }
+
+        // Add artifact to evidence container
+        String artifactId = evidence_container->addArtifact(
+            currentArtifactType,
+            currentFilename,
+            uploadBuffer.data(),
+            uploadBuffer.size(),
+            true  // Enable compression
+        );
+
+        if (artifactId.isEmpty()) {
+            Serial.println("[WiFi] ERROR: Failed to add artifact to container!");
+            server->send(500, "application/json",
+                        "{\"status\":\"error\",\"message\":\"Failed to save artifact\"}");
+            uploadBuffer.clear();
+            return;
+        }
+
+        // Update metadata with source path if provided
+        if (!currentSourcePath.isEmpty()) {
+            ArtifactMetadata meta;
+            const auto& artifacts = evidence_container->getArtifacts();
+            for (const auto& artifact : artifacts) {
+                if (artifact.artifact_id == artifactId) {
+                    meta = artifact;
+                    meta.source_path = currentSourcePath;
+                    evidence_container->addArtifactMetadata(artifactId, meta);
+                    break;
+                }
+            }
+        }
+
+        // Log successful collection
+        evidence_container->logAction(
+            "ARTIFACT_UPLOAD",
+            "Received " + currentArtifactType + ": " + currentFilename,
+            "SUCCESS - " + String(uploadBuffer.size()) + " bytes"
+        );
+
+        // Calculate transfer speed
+        float speedKBps = (uploadBuffer.size() / 1024.0) / (uploadDuration / 1000.0);
+
+        Serial.printf("[WiFi] Artifact saved: %s (%.2f KB/s)\n",
+                     artifactId.c_str(), speedKBps);
+
+        // Send success response with artifact ID
+        String response = "{";
+        response += "\"status\":\"success\",";
+        response += "\"artifact_id\":\"" + artifactId + "\",";
+        response += "\"filename\":\"" + currentFilename + "\",";
+        response += "\"size\":" + String(uploadBuffer.size()) + ",";
+        response += "\"duration_ms\":" + String(uploadDuration) + ",";
+        response += "\"speed_kbps\":" + String(speedKBps, 2);
+        response += "}";
+
+        server->send(200, "application/json", response);
+
+        // Clear buffer
+        uploadBuffer.clear();
+
+        // Finalize progress tracking
+        upload_progress.total_bytes = uploadBuffer.size();
+        upload_progress.uploaded_bytes = uploadBuffer.size();
+        upload_progress.percent = 100;
+        upload_progress.active = false;
+
+    } else if (upload.status == UPLOAD_FILE_ABORTED) {
+        Serial.println("[WiFi] Upload aborted!");
+        uploadBuffer.clear();
+
+        // Reset progress tracking
+        upload_progress.active = false;
+        upload_progress.percent = 0;
+
+        server->send(500, "application/json",
+                    "{\"status\":\"error\",\"message\":\"Upload aborted\"}");
+    }
 }
 
 String WiFiManager::getContentType(String filename) {

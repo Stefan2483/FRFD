@@ -8,6 +8,7 @@ FRFD::FRFD() {
     storage = new FRFDStorage();
     hid_automation = new HIDAutomation();
     evidence_container = nullptr;  // Created per case
+    wifi_manager = nullptr;  // Initialized after storage is ready
     state.mode = MODE_IDLE;
     state.os = OS_UNKNOWN;
     state.risk = RISK_UNKNOWN;
@@ -27,6 +28,9 @@ FRFD::~FRFD() {
     delete hid_automation;
     if (evidence_container) {
         delete evidence_container;
+    }
+    if (wifi_manager) {
+        delete wifi_manager;
     }
 }
 
@@ -104,18 +108,35 @@ void FRFD::initializeUSB() {
 }
 
 void FRFD::initializeWiFi() {
-    Serial.println("Initializing WiFi AP...");
+    Serial.println("Initializing WiFi Manager...");
 
-    WiFi.mode(WIFI_AP);
-    bool success = WiFi.softAP(WIFI_AP_SSID, WIFI_AP_PASSWORD, WIFI_AP_CHANNEL, 0, WIFI_MAX_CLIENTS);
+    if (!wifi_manager) {
+        wifi_manager = new WiFiManager(storage);
+    }
+
+    // Set device info for web interface
+    wifi_manager->setDeviceId(deviceId);
+    wifi_manager->setMode("Initializing");
+    wifi_manager->setStatus("Starting WiFi AP");
+
+    // Connect evidence container if available
+    if (evidence_container) {
+        wifi_manager->setEvidenceContainer(evidence_container);
+    }
+
+    // Start WiFi AP with web server
+    bool success = wifi_manager->begin(WIFI_AP_SSID, WIFI_AP_PASSWORD);
 
     if (success) {
-        Serial.print("WiFi AP started: ");
-        Serial.println(WiFi.softAPIP());
+        Serial.print("[WiFi] AP started: ");
+        Serial.println(wifi_manager->getAPSSID());
+        Serial.print("[WiFi] IP address: ");
+        Serial.println(wifi_manager->getAPIP());
+        Serial.println("[WiFi] Upload endpoint: http://192.168.4.1/upload");
         wifiActive = true;
         display->updateNetwork(true);
     } else {
-        Serial.println("Failed to start WiFi AP");
+        Serial.println("[WiFi] Failed to start AP");
         wifiActive = false;
     }
 }
@@ -123,6 +144,11 @@ void FRFD::initializeWiFi() {
 void FRFD::loop() {
     handleButton();
     handleSerial();
+
+    // Handle WiFi client requests
+    if (wifi_manager && wifi_manager->isActive()) {
+        wifi_manager->handleClient();
+    }
 
     // Update elapsed time display every second
     static unsigned long lastUpdate = 0;
@@ -687,6 +713,12 @@ bool FRFD::automateForensicsCollection() {
         delete evidence_container;
         evidence_container = nullptr;
         return false;
+    }
+
+    // Connect evidence container to WiFi manager for uploads
+    if (wifi_manager) {
+        wifi_manager->setEvidenceContainer(evidence_container);
+        Serial.println("[FRFD] Evidence container connected to WiFi manager");
     }
 
     // Set target system information

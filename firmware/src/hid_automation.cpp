@@ -501,9 +501,36 @@ bool HIDAutomation::automateWindowsForensics() {
 
     // Create archive
     String timestamp = String(millis());
-    String archive_cmd = "Compress-Archive -Path C:\\FRFD_Collection\\* -DestinationPath C:\\FRFD_Evidence_" + timestamp + ".zip";
+    String archive_name = "FRFD_Evidence_" + timestamp + ".zip";
+    String archive_path = "C:\\" + archive_name;
+    String archive_cmd = "Compress-Archive -Path C:\\FRFD_Collection\\* -DestinationPath " + archive_path;
     typeCommand(archive_cmd, true);
     delay(5000);
+
+    logAction("WIN_ARCHIVE", "Created evidence archive", archive_path);
+
+    // Connect to FRFD WiFi AP
+    typeCommand("netsh wlan connect name=CSIRT-FORENSICS", true);
+    delay(3000);  // Wait for WiFi connection
+
+    logAction("WIN_WIFI", "Connecting to FRFD WiFi", "CSIRT-FORENSICS");
+
+    // Define inline upload function
+    typeCommand("function Upload{param($f,$t='archive')try{$fi=Get-Item $f;$fb=[IO.File]::ReadAllBytes($f);$b=[Guid]::NewGuid().ToString();$lf=\"`r`n\";$bl=@(\"--$b\",\"Content-Disposition: form-data; name=`\"type`\"$lf\",$t,\"--$b\",\"Content-Disposition: form-data; name=`\"file`\"; filename=`\"$($fi.Name)`\"\",\"Content-Type: application/octet-stream$lf\")-join $lf;$blb=[Text.Encoding]::UTF8.GetBytes($bl);$ebb=[Text.Encoding]::UTF8.GetBytes(\"$lf--$b--$lf\");$rb=New-Object byte[]($blb.Length+$fb.Length+$ebb.Length);[Array]::Copy($blb,0,$rb,0,$blb.Length);[Array]::Copy($fb,0,$rb,$blb.Length,$fb.Length);[Array]::Copy($ebb,0,$rb,$blb.Length+$fb.Length,$ebb.Length);Invoke-WebRequest -Uri 'http://192.168.4.1/upload' -Method Post -ContentType \"multipart/form-data; boundary=$b\" -Body $rb -TimeoutSec 60}catch{Write-Error $_}}", false);
+    pressEnter();
+    delay(1000);
+
+    // Upload archive to FRFD
+    String upload_cmd = "Upload '" + archive_path + "' 'archive'";
+    typeCommand(upload_cmd, true);
+    delay(10000);  // Wait for upload to complete
+
+    logAction("WIN_UPLOAD", "Uploaded evidence to FRFD", archive_name);
+
+    // Cleanup - delete local evidence (optional, uncomment if desired)
+    // typeCommand("Remove-Item -Path C:\\FRFD_Collection -Recurse -Force", true);
+    // typeCommand("Remove-Item -Path " + archive_path + " -Force", true);
+    // delay(2000);
 
     logAction("WIN_AUTO_COMPLETE", "Windows forensics complete", "SUCCESS");
 
@@ -657,9 +684,35 @@ bool HIDAutomation::automateLinuxForensics() {
 
     // Create tarball
     String timestamp = String(millis());
-    String tar_cmd = "tar -czf /tmp/frfd_evidence_" + timestamp + ".tar.gz /tmp/frfd_collection/";
+    String archive_name = "frfd_evidence_" + timestamp + ".tar.gz";
+    String archive_path = "/tmp/" + archive_name;
+    String tar_cmd = "tar -czf " + archive_path + " /tmp/frfd_collection/";
     typeCommand(tar_cmd, true);
     delay(5000);
+
+    logAction("LNX_ARCHIVE", "Created evidence archive", archive_path);
+
+    // Connect to FRFD WiFi AP (using nmcli on modern Linux)
+    typeCommand("nmcli device wifi connect CSIRT-FORENSICS password ChangeThisPassword123!", true);
+    delay(3000);  // Wait for WiFi connection
+
+    logAction("LNX_WIFI", "Connecting to FRFD WiFi", "CSIRT-FORENSICS");
+
+    // Define inline upload function
+    typeCommand("upload(){f=\"$1\";t=\"${2:-archive}\";ip=\"${3:-192.168.4.1}\";[ ! -f \"$f\" ]&&return 1;for i in 1 2 3;do r=$(curl -s -w \"\\n%{http_code}\" -X POST -F \"file=@$f\" -F \"type=$t\" --connect-timeout 10 --max-time 60 \"http://$ip/upload\" 2>&1);c=$(echo \"$r\"|tail -n1);[ \"$c\" = \"200\" ]&&return 0;sleep 2;done;return 1;}", true);
+    delay(500);
+
+    // Upload archive to FRFD
+    String upload_cmd = "upload " + archive_path + " archive";
+    typeCommand(upload_cmd, true);
+    delay(10000);  // Wait for upload to complete
+
+    logAction("LNX_UPLOAD", "Uploaded evidence to FRFD", archive_name);
+
+    // Cleanup - delete local evidence (optional, uncomment if desired)
+    // typeCommand("rm -rf /tmp/frfd_collection", true);
+    // typeCommand("rm -f " + archive_path, true);
+    // delay(1000);
 
     logAction("LNX_AUTO_COMPLETE", "Linux forensics complete", "SUCCESS");
 
@@ -788,9 +841,35 @@ bool HIDAutomation::automateMacOSForensics() {
 
     // Create archive
     String timestamp = String(millis());
-    String tar_cmd = "tar -czf /tmp/frfd_evidence_" + timestamp + ".tar.gz /tmp/frfd_collection/";
+    String archive_name = "frfd_evidence_" + timestamp + ".tar.gz";
+    String archive_path = "/tmp/" + archive_name;
+    String tar_cmd = "tar -czf " + archive_path + " /tmp/frfd_collection/";
     typeCommand(tar_cmd, true);
     delay(5000);
+
+    logAction("MAC_ARCHIVE", "Created evidence archive", archive_path);
+
+    // Connect to FRFD WiFi AP (using networksetup on macOS)
+    typeCommand("networksetup -setairportnetwork en0 CSIRT-FORENSICS ChangeThisPassword123!", true);
+    delay(3000);  // Wait for WiFi connection
+
+    logAction("MAC_WIFI", "Connecting to FRFD WiFi", "CSIRT-FORENSICS");
+
+    // Define inline upload function (same as Linux - curl works on macOS)
+    typeCommand("upload(){f=\"$1\";t=\"${2:-archive}\";ip=\"${3:-192.168.4.1}\";[ ! -f \"$f\" ]&&return 1;for i in 1 2 3;do r=$(curl -s -w \"\\n%{http_code}\" -X POST -F \"file=@$f\" -F \"type=$t\" --connect-timeout 10 --max-time 60 \"http://$ip/upload\" 2>&1);c=$(echo \"$r\"|tail -n1);[ \"$c\" = \"200\" ]&&return 0;sleep 2;done;return 1;}", true);
+    delay(500);
+
+    // Upload archive to FRFD
+    String upload_cmd = "upload " + archive_path + " archive";
+    typeCommand(upload_cmd, true);
+    delay(10000);  // Wait for upload to complete
+
+    logAction("MAC_UPLOAD", "Uploaded evidence to FRFD", archive_name);
+
+    // Cleanup - delete local evidence (optional, uncomment if desired)
+    // typeCommand("rm -rf /tmp/frfd_collection", true);
+    // typeCommand("rm -f " + archive_path, true);
+    // delay(1000);
 
     logAction("MAC_AUTO_COMPLETE", "macOS forensics complete", "SUCCESS");
 
