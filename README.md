@@ -1,438 +1,416 @@
-DRAFT PLAN to create this:
-CSIRT Forensics Automation Tool - Lilygo T-Dongle S3
-Project: First Responder Forensics Dongle (FRFD)
+# FRFD - First Responder Forensics Dongle
 
-Executive Summary
-A portable, automated forensics and artifact extraction tool built on the Lilygo T-Dongle S3 platform, designed for CSIRT first responders to quickly assess, contain, and extract critical forensic data from potentially compromised systems.
+![Version](https://img.shields.io/badge/version-0.1.0-blue.svg)
+![Status](https://img.shields.io/badge/status-alpha-yellow.svg)
+![License](https://img.shields.io/badge/license-MIT-green.svg)
+![Platform](https://img.shields.io/badge/platform-ESP32--S3-orange.svg)
 
-Hardware Specifications
-Lilygo T-Dongle S3
+> A portable, automated forensics and artifact extraction tool built on the Lilygo T-Dongle S3 platform, designed for CSIRT first responders to quickly assess, contain, and extract critical forensic data from potentially compromised systems.
 
-MCU: ESP32-S3 (dual-core Xtensa LX7 @ 240MHz)
-Memory: 8MB PSRAM, 16MB Flash
-Display: 0.96" Color LCD (80x160 pixels) - Perfect for HUD
-Connectivity:
+---
 
-USB-C interface (can act as HID/Mass Storage/Serial)
-WiFi 802.11 b/g/n
-Bluetooth 5.0 LE
+## 🚀 Quick Start
 
+```bash
+# Clone the repository
+git clone https://github.com/your-org/FRFD.git
+cd FRFD
 
-Storage: SD Card slot support (for evidence storage)
-Size: Compact USB dongle form factor
+# Build and flash firmware (requires PlatformIO)
+pio run --target upload
 
+# Monitor serial output
+pio device monitor
+```
 
-Core Architecture
-1. Operating Modes
-A. Triage Mode (Default)
+**For detailed instructions, see [BUILD.md](docs/BUILD.md)**
 
-Automatic detection of OS (Windows/Linux/macOS)
-Quick system assessment
-Display critical indicators on LCD HUD
-Non-invasive preliminary scan
+---
 
-B. Collection Mode
+## 📋 Table of Contents
 
-Automated artifact extraction
-Memory dump capabilities
-Registry/configuration extraction
-Network state capture
-Process and service enumeration
+- [Features](#-features)
+- [Hardware](#-hardware)
+- [Project Status](#-project-status)
+- [Getting Started](#-getting-started)
+- [Usage](#-usage)
+- [Documentation](#-documentation)
+- [Contributing](#-contributing)
+- [License](#-license)
 
-C. Containment Mode
+---
 
-Network isolation commands
-Suspicious process termination
-Firewall rule implementation
-Account lockdown procedures
+## ✨ Features
 
-D. Analysis Mode
+### Operating Modes
 
-On-device quick analysis
-IOC (Indicators of Compromise) matching
-Timeline generation
-Anomaly detection
+- **🔍 Triage Mode** - Quick system assessment (5 min)
+- **📦 Collection Mode** - Full forensic artifact collection (30 min)
+- **🛡️ Containment Mode** - Network isolation and security controls
+- **🔬 Analysis Mode** - On-device IOC matching and analysis
 
+### HUD Display
 
-Feature Set
-1. HUD Display Interface
 ```
 ┌─────────────────┐
 │ CSIRT TOOLKIT   │
 │ =============== │
-│ Mode: TRIAGE    │
-│ OS: Win11       │
+│ Mode: COLLECT   │
+│ OS: Windows     │
 │ Risk: HIGH ▲    │
-│ Artifacts: 47%  │
+│ Progress: 47%   │
+│ [████████░░░░]  │
 │ Time: 02:34     │
+│ NET ✓           │
 └─────────────────┘
 ```
-Display Information:
 
-Current operation mode
-Target OS detection
-Risk assessment level
-Collection progress
-Elapsed time
-Network status
-Memory usage
+### Evidence Collection
 
-2. Automated Forensics Toolkit
-Windows Artifacts Collection
+**Windows:**
+- ✅ Process memory dumps
+- ✅ Registry autoruns & persistence
+- ✅ Event logs (Security, System, Application, PowerShell, Sysmon)
+- ✅ Network connections, DNS cache, ARP table
+- ✅ Active processes and services
+
+**Linux:**
+- ✅ System information and configuration
+- ✅ Authentication logs (auth.log, wtmp, btmp, journal)
+- ✅ Network state (ss, iptables, routes)
+- ✅ User bash history
+- ✅ Cron jobs and systemd services
+
+**Chain of Custody:**
+- SHA-256 hashing of all artifacts
+- Complete audit trail
+- Responder and case ID tracking
+- Timestamp tracking
+
+---
+
+## 🔧 Hardware
+
+### Lilygo T-Dongle S3
+
+- **MCU:** ESP32-S3 (dual-core Xtensa LX7 @ 240MHz)
+- **Memory:** 8MB PSRAM, 16MB Flash
+- **Display:** 0.96" Color LCD (80x160 pixels)
+- **Connectivity:** USB-C, WiFi 802.11 b/g/n, Bluetooth 5.0 LE
+- **Storage:** SD Card slot support
+- **Size:** Compact USB dongle form factor
+- **Cost:** ~$15-25 USD
+
+**Where to buy:**
+- [Lilygo Official Store](https://lilygo.cc)
+- AliExpress (search "Lilygo T-Dongle S3")
+- Amazon
+
+---
+
+## 📊 Project Status
+
+### ✅ Phase 1: Core Framework (COMPLETE)
+
+- [x] ESP32-S3 firmware base
+- [x] LCD driver and HUD system
+- [x] USB serial communication
+- [x] Configuration management
+- [x] Operating mode framework
+- [x] Display with real-time updates
+
+### ⚡ Phase 2: Forensics Modules (IN PROGRESS - 60%)
+
+**Windows Scripts:**
+- [x] Process memory dumps
+- [x] Registry autoruns
+- [x] Network connections
+- [x] Event log collection
+- [ ] MFT extraction
+- [ ] Prefetch analysis
+- [ ] Scheduled tasks
+
+**Linux Scripts:**
+- [x] System information
+- [x] Authentication logs
+- [x] Network state
+- [ ] Process memory dumps
+- [ ] Kernel modules
+
+**Launchers:**
+- [x] Windows PowerShell launcher
+- [x] Linux Bash launcher
+- [x] Chain of custody generation
+
+### 🔮 Phase 3: Advanced Features (PLANNED)
+
+- [ ] WiFi AP mode
+- [ ] YARA integration
+- [ ] Volatility plugins
+- [ ] Timeline generation
+- [ ] AES-256 encryption
+- [ ] Cloud upload
+
+### 🧪 Phase 4: Integration & Testing (PLANNED)
+
+- [ ] SIEM connectivity
+- [ ] Unit tests
+- [ ] Field testing
+- [ ] Security audit
+
+**Current Version:** 0.1.0-alpha
+**Status:** Ready for testing in lab environment
+
+---
+
+## 🏁 Getting Started
+
+### Prerequisites
+
+- **Hardware:** Lilygo T-Dongle S3
+- **Software:** PlatformIO (via VS Code or CLI)
+- **For Windows targets:** PowerShell 5.1+, Admin privileges
+- **For Linux targets:** Bash, root/sudo access
+
+### Installation
+
+1. **Install PlatformIO**
+   ```bash
+   # Via VS Code Extension (recommended)
+   # Or via pip:
+   pip install platformio
+   ```
+
+2. **Clone Repository**
+   ```bash
+   git clone https://github.com/your-org/FRFD.git
+   cd FRFD
+   ```
+
+3. **Build Firmware**
+   ```bash
+   pio run
+   ```
+
+4. **Flash to Device**
+   ```bash
+   # Connect Lilygo T-Dongle S3 via USB
+   pio run --target upload
+   ```
+
+5. **Verify Installation**
+   ```bash
+   pio device monitor
+   ```
+
+   You should see:
+   ```
+   === FRFD - CSIRT Forensics Dongle ===
+   Firmware Version: 0.1.0
+   FRFD initialized successfully
+   ```
+
+**For detailed build instructions, see [BUILD.md](docs/BUILD.md)**
+
+---
+
+## 💻 Usage
+
+### Windows
+
+```powershell
+# Run triage mode
+.\scripts\FRFD-Windows-Launcher.ps1 -Mode Triage
+
+# Full collection with case tracking
+.\scripts\FRFD-Windows-Launcher.ps1 -Mode Collect -CaseId "INC-2024-001" -Responder "john.doe"
+
+# Containment (network isolation)
+.\scripts\FRFD-Windows-Launcher.ps1 -Mode Contain
 ```
-/forensics_tools/windows/
-├── memory/
-│   ├── process_dump.ps1
-│   ├── memory_image.ps1
-│   └── crash_dumps.ps1
-├── registry/
-│   ├── autoruns.ps1
-│   ├── user_assist.ps1
-│   └── shimcache.ps1
-├── filesystem/
-│   ├── mft_extract.ps1
-│   ├── prefetch.ps1
-│   └── event_logs.ps1
-├── network/
-│   ├── connections.ps1
-│   ├── dns_cache.ps1
-│   └── arp_table.ps1
-└── persistence/
-    ├── scheduled_tasks.ps1
-    ├── services.ps1
-    └── wmi_consumers.ps1
-```   
-Linux Artifacts Collection
+
+### Linux
+
+```bash
+# Run triage mode
+sudo ./scripts/frfd-linux-launcher.sh triage
+
+# Full collection with case tracking
+sudo ./scripts/frfd-linux-launcher.sh collect /evidence INC-2024-001 john.doe
+
+# Containment (network isolation)
+sudo ./scripts/frfd-linux-launcher.sh contain
 ```
-/forensics_tools/linux/
-├── system/
-│   ├── proc_dump.sh
-│   ├── kernel_modules.sh
-│   └── system_info.sh
-├── logs/
-│   ├── auth_logs.sh
-│   ├── syslog.sh
-│   └── journal.sh
-├── network/
-│   ├── netstat.sh
-│   ├── iptables.sh
-│   └── connections.sh
-└── persistence/
-    ├── crontab.sh
-    ├── systemd.sh
-    └── bashrc.sh
+
+### Serial Commands
+
+Connect via serial (115200 baud):
+
 ```
-3. Communication & Exfiltration
-Secure Data Transfer
-
-WiFi AP Mode: Create isolated network for data extraction
-Encrypted Channel: AES-256 encryption for all transfers
-Serial Console: Fallback communication via USB serial
-Cloud Upload: Direct upload to CSIRT infrastructure
-
-Evidence Chain of Custody
+triage          # Start triage mode
+collect         # Start collection mode
+contain         # Start containment mode
+status          # Show current status
+os:windows      # Set detected OS to Windows
+os:linux        # Set detected OS to Linux
 ```
-{
-  "case_id": "INC-2024-0847",
-  "responder": "john.doe",
-  "device_id": "FRFD-001",
-  "timestamp": "2024-11-01T10:30:00Z",
-  "hash": "sha256:abc123...",
-  "artifacts": [
-    {
-      "type": "memory_dump",
-      "size": "4096MB",
-      "hash": "sha256:def456...",
-      "timestamp": "2024-11-01T10:31:00Z"
-    }
-  ]
-}
+
+### Evidence Output
+
+**Windows:** `C:\CSIRT\Evidence\`
+**Linux:** `/tmp/csirt/evidence/`
+
+Each collection generates:
+- Collected artifacts in timestamped directories
+- `chain_of_custody_*.json` with SHA-256 hashes
+- Summary reports
+
+---
+
+## 📚 Documentation
+
+- **[Getting Started Guide](docs/GETTING_STARTED.md)** - Complete setup and usage guide
+- **[Build Instructions](docs/BUILD.md)** - Detailed build and flash instructions
+- **[Project Overview](docs/PROJECT_OVERVIEW.md)** - Architecture and implementation status
+- **[Original Plan](docs/ORIGINAL_PLAN.md)** - Original project specification
+
+---
+
+## 🗂️ Project Structure
+
 ```
-4. CSIRT Tool Integration
-A. Volatility Framework Integration
-
-On-device memory analysis
-Process tree visualization
-Network connection mapping
-Registry hive analysis
-
-B. YARA Rule Engine
-
-Pre-loaded IOC signatures
-Custom rule deployment
-Real-time pattern matching
-Alert generation
-
-C. Timeline Generation
-
-Automated timeline creation
-Event correlation
-Visualization on HUD
-Export to standard formats (JSON, CSV)
-
-
-Implementation Phases
-Phase 1: Core Framework (Weeks 1-4)
-
-Base Firmware Development
-
-Port ESP32-S3 USB stack
-Implement multi-mode USB (HID/Mass Storage/Serial)
-LCD driver and UI framework
-Basic OS detection
-
-
-Script Execution Engine
-
-PowerShell runner for Windows
-Bash runner for Linux
-Command queuing system
-Output capture and storage
-
-
-
-Phase 2: Forensics Modules (Weeks 5-8)
-
-Artifact Collection Scripts
-
-Windows forensics scripts
-Linux forensics scripts
-macOS basic support
-Data compression and encryption
-
-
-HUD Development
-
-Real-time status display
-Progress indicators
-Alert notifications
-Menu navigation system
-
-
-
-Phase 3: Advanced Features (Weeks 9-12)
-
-Analysis Capabilities
-
-YARA rule integration
-Basic Volatility plugins
-IOC matching engine
-Anomaly detection algorithms
-
-
-Communication Systems
-
-WiFi AP configuration
-Secure data transfer protocol
-Cloud integration APIs
-Serial console fallback
-
-
-
-Phase 4: Integration & Testing (Weeks 13-16)
-
-CSIRT Tool Integration
-
-SIEM connectivity
-Ticketing system integration
-Evidence management system
-Reporting automation
-
-
-Field Testing
-
-Performance optimization
-Reliability testing
-Security audit
-Documentation
-
-
-
-
-Security Considerations
-Device Security
-
-Secure Boot: Signed firmware only
-Encryption: All stored data encrypted at rest
-Authentication: Multi-factor for sensitive operations
-Anti-tampering: Physical security measures
-
-Operational Security
-
-Minimal Footprint: Reduce system impact
-Forensic Soundness: Maintain evidence integrity
-Audit Trail: Complete logging of all actions
-Isolation: Network segmentation capabilities
-
-
-User Interface Flow
-1. Initial Connection
+FRFD/
+├── firmware/                   # ESP32-S3 firmware
+│   ├── include/               # Headers (config, display, frfd)
+│   ├── src/                   # Source files
+│   └── lib/                   # Libraries
+├── forensics_tools/           # Collection scripts
+│   ├── windows/              # Windows PowerShell scripts
+│   └── linux/                # Linux Bash scripts
+├── scripts/                   # Launcher scripts
+│   ├── FRFD-Windows-Launcher.ps1
+│   └── frfd-linux-launcher.sh
+├── config/                    # Configuration files
+│   └── config.json
+├── docs/                      # Documentation
+├── rules/                     # YARA/IOC rules (planned)
+├── web_interface/            # Management portal (planned)
+└── platformio.ini            # PlatformIO configuration
 ```
-  [USB Inserted] → [OS Detection] → [Mode Selection]
-                                          ↓
-                            [Triage] [Collect] [Contain]
-```
-3. Operation Workflow
-```
-   [Mode Selected] → [Script Execution] → [Progress Display]
-        ↓                                      ↓
-[Configuration]                      [Real-time Updates]
-        ↓                                      ↓
-[Confirmation]                         [Completion Alert]
-```
- 5. Data Extraction
-```
- [Collection Complete] → [Encryption] → [Transfer Method]
-                                              ↓
-                        [WiFi] [Serial] [SD Card] [Cloud]
-```
-Configuration Management
-config.json Structure
-```
-{
-  "device_config": {
-    "device_id": "FRFD-001",
-    "organization": "ACME-CSIRT",
-    "wifi_ssid": "CSIRT-FORENSICS",
-    "wifi_password": "encrypted_password"
-  },
-  "operational_config": {
-    "default_mode": "triage",
-    "auto_collect": true,
-    "collection_timeout": 300,
-    "encryption_enabled": true
-  },
-  "forensics_config": {
-    "windows_tools": ["memory", "registry", "network"],
-    "linux_tools": ["system", "logs", "persistence"],
-    "yara_rules": "/rules/default.yar",
-    "volatility_profiles": ["Win10x64", "Ubuntu20"]
-  },
-  "reporting_config": {
-    "siem_endpoint": "https://siem.company.com/api",
-    "ticket_system": "ServiceNow",
-    "evidence_server": "https://evidence.company.com"
-  }
-}
-```
-Deployment Scripts
-1. Windows PowerShell Launcher
-```
-  # FRFD Launcher Script
-$mode = "triage"
-$outputPath = "C:\CSIRT\Evidence\"
 
-# Detect and load appropriate modules
-Import-Module .\FRFD-Windows.psm1
+---
 
-# Execute based on mode
-switch ($mode) {
-    "triage" { 
-        Invoke-TriageCollection -Output $outputPath 
-    }
-    "collect" { 
-        Invoke-FullCollection -Output $outputPath 
-    }
-    "contain" { 
-        Invoke-ContainmentProcedure 
-    }
-}
-# Send results back to dongle
-Send-ResultsToDevice -Path $outputPath
-```
-2. Linux Bash Launcher
-```
-#!/bin/bash
-# FRFD Linux Launcher
+## 🤝 Contributing
 
-MODE="triage"
-OUTPUT_DIR="/tmp/csirt/evidence/"
+Contributions are welcome! Areas that need work:
 
-# Load functions
-source ./frfd-linux-lib.sh
+1. **Forensics Scripts**
+   - Additional Windows artifacts (MFT, Prefetch, ShimCache)
+   - macOS support
+   - Memory imaging tools
 
-# Execute based on mode
-case $MODE in
-    triage)
-        run_triage_collection "$OUTPUT_DIR"
-        ;;
-    collect)
-        run_full_collection "$OUTPUT_DIR"
-        ;;
-    contain)
-        run_containment_procedure
-        ;;
-esac
+2. **Firmware Features**
+   - WiFi AP mode implementation
+   - SD card support
+   - YARA integration
 
-# Transfer results
-transfer_to_device "$OUTPUT_DIR"
-```
-Web Interface (Management Portal)
-Features:
+3. **Documentation**
+   - User manual
+   - Training materials
+   - Case studies
 
-Dashboard
+4. **Testing**
+   - Unit tests
+   - Integration tests
+   - Field testing
 
-Connected devices status
-Recent incidents
-Collection statistics
-Alert notifications
+**To contribute:**
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Submit a pull request
 
+---
 
-Configuration Management
+## 🔒 Security Considerations
 
-Deploy configurations
-Update forensics scripts
-Manage YARA rules
-Set collection profiles
+⚠️ **Important:** This tool is designed for authorized incident response and forensics by trained professionals.
 
+- **Physical Security:** Keep FRFD devices secure
+- **Access Control:** Require authentication for sensitive operations
+- **Audit Logging:** Review all actions
+- **Chain of Custody:** Always maintain proper documentation
+- **Testing:** Never use on production systems without thorough testing
+- **Legal:** Ensure proper authorization before use
 
-Evidence Management
+---
 
-Browse collected artifacts
-Generate reports
-Export to SIEM
-Chain of custody tracking
+## 📄 License
 
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-Analytics
+---
 
-Threat indicators
-Pattern analysis
-Timeline visualization
-IOC correlation
+## 🙏 Acknowledgments
 
+- Lilygo for the T-Dongle S3 hardware
+- ESP32 community
+- SANS DFIR community
+- All CSIRT professionals
 
+---
 
+## 📞 Support
 
-Expected Outcomes
-Performance Metrics
+- **Documentation:** See `docs/` directory
+- **Issues:** Report on GitHub Issues
+- **Community:** CSIRT forums and mailing lists
 
-Boot Time: < 3 seconds
-OS Detection: < 1 second
-Triage Collection: < 5 minutes
-Full Collection: < 30 minutes
-Data Transfer Rate: > 10 MB/s
+---
 
-Development Resources
-Required Libraries
+## 🗺️ Roadmap
 
-ESP-IDF: Core ESP32-S3 framework
-TinyUSB: USB stack implementation
-LVGL: LCD graphics library
-mbedTLS: Encryption library
-cJSON: JSON parsing
-FatFS: SD card filesystem
+### Version 0.2.0 (Q1 2025)
+- Complete Phase 2 forensics scripts
+- WiFi AP mode
+- SD card support
+- Enhanced HUD with navigation
 
-Development Tools
+### Version 0.3.0 (Q2 2025)
+- YARA integration
+- Timeline generation
+- AES-256 encryption
+- Cloud upload
 
-VSCode with PlatformIO
-ESP32 Flash Tool
-Serial Monitor
-Wireshark for debugging
-QEMU for testing
+### Version 1.0.0 (Q3 2025)
+- SIEM integration
+- Complete documentation
+- Security audit
+- Production ready
 
-Conclusion
-The CSIRT Forensics Automation Tool leveraging the Lilygo T-Dongle S3 provides first responders with a powerful, portable, and automated solution for incident response. By combining the hardware capabilities of the ESP32-S3 with comprehensive forensics scripts and an intuitive HUD interface, this tool significantly reduces response time and improves the quality of evidence collection during critical incidents.
-The modular design allows for easy updates and customization based on specific organizational needs, while the secure communication channels ensure evidence integrity throughout the collection and analysis process.
+---
 
+## 📊 Stats
 
+- **Lines of Code:** ~5,000+
+- **Forensics Scripts:** 10+ (Windows & Linux)
+- **Operating Modes:** 4
+- **Supported OS:** Windows, Linux, (macOS planned)
+- **Hardware Cost:** ~$20
+- **Development Status:** Alpha
+
+---
+
+**Built with ❤️ for CSIRT professionals**
+
+**Happy Forensics! 🔍**
+
+---
+
+## Quick Links
+
+- 📖 [Getting Started](docs/GETTING_STARTED.md)
+- 🔨 [Build Guide](docs/BUILD.md)
+- 📋 [Project Overview](docs/PROJECT_OVERVIEW.md)
+- 🐛 [Report Issues](https://github.com/your-org/FRFD/issues)
+- 💬 [Discussions](https://github.com/your-org/FRFD/discussions)

@@ -1,0 +1,44 @@
+{
+  "device_config": {
+    "device_id": "FRFD-001",
+    "organization": "CSIRT-TEAM",
+    "wifi_ssid": "CSIRT-FORENSICS",
+    "wifi_password": "ChangeThisPassword123!",
+    "firmware_version": "0.1.0"
+  },
+  "operational_config": {
+    "default_mode": "triage",
+    "auto_collect": true,
+    "collection_timeout": 300,
+    "encryption_enabled": true,
+    "max_artifact_size_mb": 4096
+  },
+  "forensics_config": {
+    "windows_tools": ["memory", "registry", "network", "filesystem", "persistence"],
+    "linux_tools": ["system", "logs", "persistence", "network"],
+    "yara_rules": "/rules/default.yar",
+    "volatility_profiles": ["Win10x64", "Win11x64", "Ubuntu20", "Ubuntu22"],
+    "compression_enabled": true,
+    "hash_algorithms": ["sha256", "md5"]
+  },
+  "reporting_config": {
+    "siem_endpoint": "https://siem.company.com/api",
+    "ticket_system": "ServiceNow",
+    "evidence_server": "https://evidence.company.com",
+    "generate_timeline": true,
+    "export_formats": ["json", "csv", "html"]
+  },
+  "security_config": {
+    "secure_boot": true,
+    "encrypt_at_rest": true,
+    "require_authentication": true,
+    "audit_logging": true,
+    "anti_tamper": true
+  },
+  "display_config": {
+    "brightness": 80,
+    "timeout_seconds": 300,
+    "show_detailed_progress": true,
+    "alert_sound": true
+  }
+}

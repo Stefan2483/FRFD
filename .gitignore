@@ -1,0 +1,91 @@
+# PlatformIO
+.pio/
+.pioenvs/
+.piolibdeps/
+.vscode/
+.clang_complete
+.gcc-flags.json
+
+# Build artifacts
+*.bin
+*.elf
+*.hex
+*.map
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+
+# Evidence and output
+evidence/
+*.dmp
+*.evtx
+*.log
+chain_of_custody*.json
+
+# Temporary files
+*.tmp
+*.temp
+*.cache
+*.backup
+
+# OS
+Thumbs.db
+.DS_Store
+desktop.ini
+
+# Secrets and credentials
+config/secrets.json
+*.key
+*.pem
+*.p12
+credentials/
+
+# Large files
+*.tar.gz
+*.zip
+*.7z
+*.rar
+
+# Logs
+logs/
+*.log
+
+# Test output
+test_results/
+coverage/
+
+# Documentation build
+docs/_build/
+docs/.doctrees/
+
+# Node modules (if web interface uses Node)
+node_modules/
+package-lock.json
+
+# Compiled libraries
+*.a
+*.lib
+*.dll
+*.dylib
+*.so
+
+# Arduino/ESP32 specific
+*.ino.bin
+*.ino.elf
+*.ino.map
+*.ino.partitions.bin
