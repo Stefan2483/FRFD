@@ -179,6 +179,45 @@ public:
     bool executeWindowsTimeline();
     bool executeWindowsADS();
     bool executeWindowsShadowCopies();
+    bool executeWindowsDefender();
+    bool executeWindowsFirewall();
+    bool executeWindowsWLANProfiles();
+    bool executeWindowsInstalledPrograms();
+    bool executeWindowsProcessList();
+    bool executeWindowsNetworkShares();
+    bool executeWindowsDrivers();
+    bool executeWindowsWindowsUpdate();
+    bool executeWindowsEnvironmentVars();
+    bool executeWindowsStartupPrograms();
+    bool executeWindowsErrorReporting();
+    bool executeWindowsHosts();
+    bool executeWindowsDNSCache();
+    bool executeWindowsCertificates();
+    bool executeWindowsActivation();
+
+    // Advanced Windows Forensics (v1.1.0+)
+    bool executeWindowsSearchDatabase();
+    bool executeWindowsActivitiesCache();
+    bool executeWindowsNotificationDB();
+    bool executeWindowsClipboardHistory();
+    bool executeWindowsConnectedDevices();
+    bool executeWindowsBackgroundTasks();
+    bool executeWindowsCortanaHistory();
+    bool executeWindowsOfficeRecent();
+    bool executeWindowsStickyNotes();
+    bool executeWindowsScreenTime();
+    bool executeWindowsAppExecAlias();
+    bool executeWindowsPackageManager();
+    bool executeWindowsUpdateDetails();
+    bool executeWindowsPerformanceCounters();
+    bool executeWindowsSecurityAnalysis();
+    bool executeWindowsRDPCache();
+    bool executeWindowsTerminalServerClient();
+    bool executeWindowsUSNJournal();
+    bool executeWindowsVolumeInformation();
+    bool executeWindowsSRUMDetailed();
+    bool executeWindowsIISLogs();
+    bool executeWindowsGroupPolicy();
 
     // Linux Automation
     bool executeLinuxSystemInfo();
@@ -200,6 +239,45 @@ public:
     bool executeLinuxUSBDevices();
     bool executeLinuxAuditLogs();
     bool executeLinuxTimezone();
+    bool executeLinuxProcessList();
+    bool executeLinuxOpenFiles();
+    bool executeLinuxEnvironmentVars();
+    bool executeLinuxSysctl();
+    bool executeLinuxSELinux();
+    bool executeLinuxSystemdServices();
+    bool executeLinuxMountedFilesystems();
+    bool executeLinuxLoginHistory();
+    bool executeLinuxHostsFile();
+    bool executeLinuxResolverConfig();
+    bool executeLinuxNetworkInterfaces();
+    bool executeLinuxRoutingTable();
+    bool executeLinuxARPCache();
+    bool executeLinuxXorgLogs();
+    bool executeLinuxBashHistory();
+
+    // Advanced Linux Forensics (v1.1.0+)
+    bool executeLinuxAppArmorProfiles();
+    bool executeLinuxKubernetesPods();
+    bool executeLinuxContainerInspection();
+    bool executeLinuxSystemdAnalyze();
+    bool executeLinuxJournalCorruption();
+    bool executeLinuxUserActivityTimeline();
+    bool executeLinuxSudoHistory();
+    bool executeLinuxLastCommand();
+    bool executeLinuxFailedLogins();
+    bool executeLinuxOpenSSLCertificates();
+    bool executeLinuxSystemCalls();
+    bool executeLinuxKernelParameters();
+    bool executeLinuxMemoryMaps();
+    bool executeLinuxSocketStatistics();
+    bool executeLinuxIPTables();
+    bool executeLinuxNFTables();
+    bool executeLinuxNetworkNamespaces();
+    bool executeLinuxCGroups();
+    bool executeLinuxCapabilities();
+    bool executeLinuxEbpfPrograms();
+    bool executeLinuxInitRamfs();
+    bool executeLinuxGrubConfig();
 
     // macOS Automation
     bool executeMacOSSystemInfo();
@@ -212,6 +290,50 @@ public:
     bool executeMacOSInstallHistory();
     bool executeMacOSKeychain();
     bool executeMacOSMemoryDump();
+    bool executeMacOSNetworkInterfaces();
+    bool executeMacOSLaunchAgents();
+    bool executeMacOSApplicationSupport();
+    bool executeMacOSFirewall();
+    bool executeMacOSTimeMachine();
+    bool executeMacOSProcessList();
+    bool executeMacOSOpenFiles();
+    bool executeMacOSNetworkConnections();
+    bool executeMacOSKernelExtensions();
+    bool executeMacOSLoginHistory();
+    bool executeMacOSFileVault();
+    bool executeMacOSGatekeeper();
+    bool executeMacOSSIP();
+    bool executeMacOSAirportNetworks();
+    bool executeMacOSBluetoothDevices();
+    bool executeMacOSMountedVolumes();
+    bool executeMacOSLaunchDaemons();
+    bool executeMacOSUserDefaults();
+    bool executeMacOSRecentItems();
+    bool executeMacOSNotificationCenter();
+
+    // Advanced macOS Forensics (v1.1.0+)
+    bool executeMacOSUnifiedLogsAdvanced();
+    bool executeMacOSAPFSSnapshots();
+    bool executeMacOSNotificationDBv2();
+    bool executeMacOSQuarantineEventsV2();
+    bool executeMacOSTCCDatabase();
+    bool executeMacOSKnowledgeC();
+    bool executeMacOSiCloudAccounts();
+    bool executeMacOSKeychainAnalysis();
+    bool executeMacOSAirDropHistory();
+    bool executeMacOSHandoffActivities();
+    bool executeMacOSSpotlightShortcuts();
+    bool executeMacOSCoreAnalytics();
+    bool executeMacOSXProtectLogs();
+    bool executeMacOSMRTLogs();
+    bool executeMacOSAirPlayReceivers();
+    bool executeMacOSShareKitContacts();
+    bool executeMacOSSiriAnalytics();
+    bool executeMacOSCrashReporter();
+    bool executeMacOSCodesignVerification();
+    bool executeMacOSBSMaudit();
+    bool executeMacOSPowerMetrics();
+    bool executeMacOSAccountsPlist();
 
     // Forensic Logging
     void logAction(const String& action_type, const String& command, const String& result);
