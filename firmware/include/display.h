@@ -125,6 +125,24 @@ public:
     void showLiveStats(uint8_t modulesCompleted, uint8_t modulesTotal, unsigned long elapsedMs, uint8_t artifactsCollected);
     void drawCompactProgressBar(uint8_t y, uint8_t percent, const String& label);
     void drawModuleStatus(uint8_t y, const String& moduleName, const String& status, uint16_t statusColor);
+
+    // Advanced Forensic Dashboard (v1.1.0+)
+    void showForensicDashboard(uint8_t modulesComplete, uint8_t modulesTotal, uint8_t threats, uint16_t artifacts);
+    void showThreatIndicator(uint8_t threatLevel, const String& threatType);
+    void showArtifactCounter(uint16_t count, const String& category);
+    void showModuleGrid(const std::vector<String>& modules, const std::vector<uint8_t>& status);
+    void showRealTimeMetrics(uint32_t memUsed, uint32_t memTotal, uint8_t cpuPercent, uint32_t sdUsed);
+    void showNetworkActivity(bool active, uint32_t bytesTransferred, const String& protocol);
+    void showTimeline(const std::vector<String>& events, const std::vector<unsigned long>& timestamps);
+    void drawMiniGraph(uint8_t x, uint8_t y, uint8_t w, uint8_t h, const uint8_t* data, uint8_t dataLen);
+    void drawThreatIcon(uint8_t x, uint8_t y, uint8_t level);
+    void drawNetworkIndicator(uint8_t x, uint8_t y, bool active);
+
+private:
+    // Dashboard state tracking
+    uint16_t totalArtifacts;
+    uint8_t currentThreats;
+    uint32_t lastUpdateTime;
 };
 
 #endif // DISPLAY_H
