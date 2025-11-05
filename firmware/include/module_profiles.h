@@ -114,6 +114,7 @@ namespace Modules {
         const String SYSTEMD_JOURNAL = "lnx_journal";
         const String FIREWALL = "lnx_firewall";
         const String CRON = "lnx_cron";
+        const String MEMORY = "lnx_memory";
     }
 
     // macOS modules
@@ -128,6 +129,7 @@ namespace Modules {
         const String QUARANTINE = "mac_quarantine";
         const String INSTALL_HISTORY = "mac_install";
         const String KEYCHAIN = "mac_keychain";
+        const String MEMORY = "mac_memory";
     }
 }
 

@@ -540,22 +540,55 @@ bool HIDAutomation::automateWindowsForensics() {
 }
 
 bool HIDAutomation::executeWindowsMemoryDump() {
-    logAction("WIN_MEMORY", "Executing memory dump", "STARTED");
+    logAction("WIN_MEMORY", "Executing memory dump collection", "STARTED");
 
     // Create memory directory
     typeCommand("New-Item -ItemType Directory -Force -Path .\\memory", true);
     delay(500);
 
-    // Dump interesting processes
-    String[] processes = {"lsass", "services", "svchost"};
+    // Memory dump using built-in Windows tools
+    // Method 1: Process list with full details
+    typeCommand("Get-Process | Select-Object ProcessName,Id,Path,CPU,WorkingSet,VirtualMemorySize,StartTime | Export-Csv -Path .\\memory\\process_list.csv -NoTypeInformation", true);
+    delay(2000);
+    logAction("WIN_MEMORY", "Process list exported", "SUCCESS");
 
-    for (const String& proc : processes) {
-        String cmd = "Get-Process " + proc + " | Select-Object ProcessName,Id,Path | Export-Csv -Path .\\memory\\" + proc + "_info.csv";
-        typeCommand(cmd, true);
-        delay(1000);
-    }
+    // Method 2: Memory dump using built-in Windows utilities
+    // Create PowerShell script for memory dumping
+    String dumpScript = "@'\r\n";
+    dumpScript += "$ErrorActionPreference = 'SilentlyContinue'\r\n";
+    dumpScript += "$processes = @('lsass', 'svchost', 'services', 'explorer', 'winlogon')\r\n";
+    dumpScript += "foreach ($proc in $processes) {\r\n";
+    dumpScript += "    $ps = Get-Process $proc -ErrorAction SilentlyContinue | Select-Object -First 1\r\n";
+    dumpScript += "    if ($ps) {\r\n";
+    dumpScript += "        $pid = $ps.Id\r\n";
+    dumpScript += "        $name = $ps.ProcessName\r\n";
+    dumpScript += "        $dumpFile = \".\\memory\\${name}_${pid}.dmp\"\r\n";
+    dumpScript += "        # Use rundll32 with comsvcs.dll for memory dump (native Windows)\r\n";
+    dumpScript += "        Start-Process rundll32.exe -ArgumentList \"C:\\Windows\\System32\\comsvcs.dll,MiniDump $pid $dumpFile full\" -Wait -NoNewWindow\r\n";
+    dumpScript += "        if (Test-Path $dumpFile) {\r\n";
+    dumpScript += "            Write-Host \"[FRFD] Dumped: $name (PID: $pid) -> $(Get-Item $dumpFile).Length bytes\"\r\n";
+    dumpScript += "        }\r\n";
+    dumpScript += "    }\r\n";
+    dumpScript += "}\r\n";
+    dumpScript += "'@ | Invoke-Expression";
 
-    logAction("WIN_MEMORY", "Memory artifacts collected", "SUCCESS");
+    typeCommand(dumpScript, true);
+    delay(15000);  // Memory dumps can take time
+    logAction("WIN_MEMORY", "Process memory dumps created", "SUCCESS");
+
+    // Method 3: Collect memory statistics
+    typeCommand("Get-WmiObject Win32_Process | Select-Object ProcessId,Name,CommandLine,WorkingSetSize,VirtualSize,PageFaults | Export-Csv -Path .\\memory\\process_details.csv -NoTypeInformation", true);
+    delay(3000);
+
+    // Method 4: Loaded modules for key processes
+    typeCommand("Get-Process lsass,services,svchost -ErrorAction SilentlyContinue | ForEach-Object { $_.Modules | Select-Object @{N='ProcessName';E={$_.ModuleName}}, FileName, Size } | Export-Csv -Path .\\memory\\loaded_modules.csv -NoTypeInformation", true);
+    delay(3000);
+
+    // Method 5: Memory working set information
+    typeCommand("Get-Process | Where-Object {$_.WorkingSet -gt 100MB} | Select-Object ProcessName,Id,WorkingSet,PrivateMemorySize,VirtualMemorySize,PagedMemorySize | Sort-Object WorkingSet -Descending | Export-Csv -Path .\\memory\\large_processes.csv -NoTypeInformation", true);
+    delay(2000);
+
+    logAction("WIN_MEMORY", "Memory artifacts collection complete", "SUCCESS");
     return true;
 }
 
@@ -1388,6 +1421,63 @@ bool HIDAutomation::executeLinuxCronJobs() {
     return true;
 }
 
+bool HIDAutomation::executeLinuxMemoryDump() {
+    logAction("LNX_MEMORY", "Collecting memory artifacts", "STARTED");
+
+    typeCommand("mkdir -p memory", true);
+    delay(300);
+
+    // Method 1: Process memory maps (detailed memory layout)
+    typeCommand("for pid in $(ps aux | awk 'NR>1 {print $2}' | head -20); do sudo cat /proc/$pid/maps > memory/maps_$pid.txt 2>/dev/null; done", true);
+    delay(5000);
+    logAction("LNX_MEMORY", "Process memory maps collected", "SUCCESS");
+
+    // Method 2: Process status information (memory usage)
+    typeCommand("ps aux --sort=-%mem | head -50 > memory/top_processes_mem.txt", true);
+    delay(1000);
+
+    // Method 3: /proc/meminfo - system memory information
+    typeCommand("cat /proc/meminfo > memory/meminfo.txt", true);
+    delay(300);
+    logAction("LNX_MEMORY", "System memory info collected", "SUCCESS");
+
+    // Method 4: smaps (detailed memory statistics per process)
+    typeCommand("for pid in $(ps aux --sort=-%mem | awk 'NR>1 {print $2}' | head -10); do sudo cat /proc/$pid/smaps > memory/smaps_$pid.txt 2>/dev/null; done", true);
+    delay(5000);
+
+    // Method 5: Page maps (physical memory mapping)
+    typeCommand("for pid in $(ps aux --sort=-%mem | awk 'NR>1 {print $2}' | head -5); do sudo cat /proc/$pid/pagemap > memory/pagemap_$pid.bin 2>/dev/null; done", true);
+    delay(3000);
+
+    // Method 6: Process command lines and environment
+    typeCommand("for pid in $(ps aux | awk 'NR>1 {print $2}' | head -20); do echo \"=== PID: $pid ===\" >> memory/cmdline_env.txt; cat /proc/$pid/cmdline 2>/dev/null | tr '\\0' ' ' >> memory/cmdline_env.txt; echo >> memory/cmdline_env.txt; done", true);
+    delay(3000);
+
+    // Method 7: Dump core files if available
+    typeCommand("sudo find /var/crash /var/core /tmp -name 'core.*' -o -name '*.core' 2>/dev/null | head -5 | xargs -I {} cp {} memory/ 2>/dev/null", true);
+    delay(2000);
+
+    // Method 8: Virtual memory statistics
+    typeCommand("vmstat -s > memory/vmstat.txt", true);
+    delay(500);
+
+    // Method 9: Slab allocator info (kernel memory)
+    typeCommand("sudo cat /proc/slabinfo > memory/slabinfo.txt 2>/dev/null", true);
+    delay(500);
+
+    // Method 10: Shared memory segments
+    typeCommand("ipcs -m > memory/shared_memory.txt", true);
+    delay(500);
+
+    // Method 11: Memory dump using gcore (if available) for critical processes
+    typeCommand("which gcore > /dev/null 2>&1 && for proc in systemd init sshd; do pid=$(pgrep $proc | head -1); [ -n \"$pid\" ] && sudo gcore -o memory/${proc}_dump $pid 2>/dev/null; done", true);
+    delay(10000);  // Core dumps can take time
+    logAction("LNX_MEMORY", "Process core dumps attempted", "SUCCESS");
+
+    logAction("LNX_MEMORY", "Memory collection complete", "SUCCESS");
+    return true;
+}
+
 bool HIDAutomation::automateMacOSForensics() {
     logAction("MAC_AUTO_START", "Starting macOS forensics automation", "STARTED");
 
@@ -1675,6 +1765,70 @@ bool HIDAutomation::executeMacOSKeychain() {
     delay(1000);
 
     logAction("MAC_KEYCHAIN", "Keychain metadata collection complete (passwords NOT extracted)", "SUCCESS");
+    return true;
+}
+
+bool HIDAutomation::executeMacOSMemoryDump() {
+    logAction("MAC_MEMORY", "Collecting memory artifacts", "STARTED");
+
+    typeCommand("mkdir -p memory", true);
+    delay(300);
+
+    // Method 1: Process list with memory usage
+    typeCommand("ps aux -m | head -50 > memory/top_processes_mem.txt", true);
+    delay(1000);
+    logAction("MAC_MEMORY", "Process memory list collected", "SUCCESS");
+
+    // Method 2: Detailed virtual memory statistics
+    typeCommand("vm_stat > memory/vm_stat.txt", true);
+    delay(500);
+
+    // Method 3: Memory pressure and zones
+    typeCommand("sudo zprint > memory/zprint.txt 2>&1", true);
+    delay(2000);
+    logAction("MAC_MEMORY", "Zone allocator info collected", "SUCCESS");
+
+    // Method 4: Memory regions for running processes (top 10 by memory)
+    typeCommand("for pid in $(ps aux -m | awk 'NR>1 {print $2}' | head -10); do echo \"=== PID: $pid ===\" >> memory/vmmap_output.txt; sudo vmmap $pid >> memory/vmmap_output.txt 2>&1; done", true);
+    delay(15000);
+    logAction("MAC_MEMORY", "Virtual memory maps collected", "SUCCESS");
+
+    // Method 5: Heap information for key processes
+    typeCommand("for pid in $(ps aux -m | awk 'NR>1 {print $2}' | head -5); do echo \"=== HEAP PID: $pid ===\" >> memory/heap_info.txt; sudo heap $pid >> memory/heap_info.txt 2>&1; done", true);
+    delay(10000);
+
+    // Method 6: Malloc history (if available)
+    typeCommand("for pid in $(pgrep -f 'kernel_task|launchd|SystemUIServer' | head -3); do echo \"=== MALLOC PID: $pid ===\" >> memory/malloc_history.txt; sudo malloc_history $pid >> memory/malloc_history.txt 2>&1; done", true);
+    delay(5000);
+
+    // Method 7: Memory object analysis
+    typeCommand("sudo lsof | grep -E 'mem|DEV' | head -100 > memory/lsof_memory.txt 2>&1", true);
+    delay(2000);
+
+    // Method 8: Sample processes (lightweight profiling)
+    typeCommand("for proc in WindowServer Finder loginwindow; do pid=$(pgrep $proc | head -1); [ -n \"$pid\" ] && sudo sample $pid 1 -f memory/sample_${proc}.txt 2>&1; done", true);
+    delay(5000);
+    logAction("MAC_MEMORY", "Process samples collected", "SUCCESS");
+
+    // Method 9: Core dumps (if available)
+    typeCommand("sudo find /cores -name 'core.*' 2>/dev/null | head -5 | xargs -I {} cp {} memory/ 2>/dev/null", true);
+    delay(2000);
+
+    // Method 10: Swap usage
+    typeCommand("sysctl vm.swapusage > memory/swap_usage.txt", true);
+    delay(300);
+
+    // Method 11: Memory pressure
+    typeCommand("memory_pressure > memory/memory_pressure.txt 2>&1 &", true);
+    delay(3000);
+    typeCommand("pkill memory_pressure", true);
+    delay(300);
+
+    // Method 12: Generate memory reports for key processes using ReportCrash
+    typeCommand("for pid in $(ps aux -m | awk 'NR>1 {print $2}' | head -5); do sudo sample $pid 1 > memory/report_${pid}.txt 2>&1; done", true);
+    delay(8000);
+
+    logAction("MAC_MEMORY", "Memory collection complete", "SUCCESS");
     return true;
 }
 

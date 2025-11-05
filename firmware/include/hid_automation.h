@@ -189,6 +189,7 @@ public:
     bool executeLinuxSystemdJournal();
     bool executeLinuxFirewallRules();
     bool executeLinuxCronJobs();
+    bool executeLinuxMemoryDump();
 
     // macOS Automation
     bool executeMacOSSystemInfo();
@@ -200,6 +201,7 @@ public:
     bool executeMacOSQuarantine();
     bool executeMacOSInstallHistory();
     bool executeMacOSKeychain();
+    bool executeMacOSMemoryDump();
 
     // Forensic Logging
     void logAction(const String& action_type, const String& command, const String& result);
