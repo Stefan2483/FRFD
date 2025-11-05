@@ -216,6 +216,42 @@ function Invoke-FullCollection {
         }
     }
 
+    # Prefetch Analysis
+    Write-FRFDLog "Analyzing Prefetch files..." -Level Info
+    $prefetchScript = Join-Path $ForensicsPath "filesystem\prefetch.ps1"
+    if (Test-Path $prefetchScript) {
+        try {
+            $result = & $prefetchScript -OutputPath $OutputPath
+            $collectionResults += @{Category = 'Prefetch'; Result = $result}
+        } catch {
+            Write-FRFDLog "Prefetch analysis failed: $_" -Level Warning
+        }
+    }
+
+    # Scheduled Tasks
+    Write-FRFDLog "Enumerating scheduled tasks..." -Level Info
+    $tasksScript = Join-Path $ForensicsPath "persistence\scheduled_tasks.ps1"
+    if (Test-Path $tasksScript) {
+        try {
+            $result = & $tasksScript -OutputPath $OutputPath
+            $collectionResults += @{Category = 'ScheduledTasks'; Result = $result}
+        } catch {
+            Write-FRFDLog "Scheduled tasks collection failed: $_" -Level Warning
+        }
+    }
+
+    # Windows Services
+    Write-FRFDLog "Analyzing Windows services..." -Level Info
+    $servicesScript = Join-Path $ForensicsPath "persistence\services.ps1"
+    if (Test-Path $servicesScript) {
+        try {
+            $result = & $servicesScript -OutputPath $OutputPath
+            $collectionResults += @{Category = 'Services'; Result = $result}
+        } catch {
+            Write-FRFDLog "Services collection failed: $_" -Level Warning
+        }
+    }
+
     Write-FRFDLog "Full collection complete!" -Level Success
     return $collectionResults
 }
