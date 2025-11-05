@@ -179,6 +179,21 @@ public:
     bool executeWindowsTimeline();
     bool executeWindowsADS();
     bool executeWindowsShadowCopies();
+    bool executeWindowsDefender();
+    bool executeWindowsFirewall();
+    bool executeWindowsWLANProfiles();
+    bool executeWindowsInstalledPrograms();
+    bool executeWindowsProcessList();
+    bool executeWindowsNetworkShares();
+    bool executeWindowsDrivers();
+    bool executeWindowsWindowsUpdate();
+    bool executeWindowsEnvironmentVars();
+    bool executeWindowsStartupPrograms();
+    bool executeWindowsErrorReporting();
+    bool executeWindowsHosts();
+    bool executeWindowsDNSCache();
+    bool executeWindowsCertificates();
+    bool executeWindowsActivation();
 
     // Linux Automation
     bool executeLinuxSystemInfo();
@@ -200,6 +215,21 @@ public:
     bool executeLinuxUSBDevices();
     bool executeLinuxAuditLogs();
     bool executeLinuxTimezone();
+    bool executeLinuxProcessList();
+    bool executeLinuxOpenFiles();
+    bool executeLinuxEnvironmentVars();
+    bool executeLinuxSysctl();
+    bool executeLinuxSELinux();
+    bool executeLinuxSystemdServices();
+    bool executeLinuxMountedFilesystems();
+    bool executeLinuxLoginHistory();
+    bool executeLinuxHostsFile();
+    bool executeLinuxResolverConfig();
+    bool executeLinuxNetworkInterfaces();
+    bool executeLinuxRoutingTable();
+    bool executeLinuxARPCache();
+    bool executeLinuxXorgLogs();
+    bool executeLinuxBashHistory();
 
     // macOS Automation
     bool executeMacOSSystemInfo();
@@ -217,6 +247,21 @@ public:
     bool executeMacOSApplicationSupport();
     bool executeMacOSFirewall();
     bool executeMacOSTimeMachine();
+    bool executeMacOSProcessList();
+    bool executeMacOSOpenFiles();
+    bool executeMacOSNetworkConnections();
+    bool executeMacOSKernelExtensions();
+    bool executeMacOSLoginHistory();
+    bool executeMacOSFileVault();
+    bool executeMacOSGatekeeper();
+    bool executeMacOSSIP();
+    bool executeMacOSAirportNetworks();
+    bool executeMacOSBluetoothDevices();
+    bool executeMacOSMountedVolumes();
+    bool executeMacOSLaunchDaemons();
+    bool executeMacOSUserDefaults();
+    bool executeMacOSRecentItems();
+    bool executeMacOSNotificationCenter();
 
     // Forensic Logging
     void logAction(const String& action_type, const String& command, const String& result);

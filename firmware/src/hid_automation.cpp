@@ -1120,6 +1120,375 @@ bool HIDAutomation::executeWindowsShadowCopies() {
     return true;
 }
 
+bool HIDAutomation::executeWindowsDefender() {
+    logAction("WIN_DEFENDER", "Collecting Windows Defender information", "STARTED");
+
+    typeCommand("New-Item -ItemType Directory -Force -Path .\\defender", true);
+    delay(500);
+
+    // Get Defender status
+    typeCommand("Get-MpComputerStatus | Export-Clixml .\\defender\\defender_status.xml", true);
+    delay(2000);
+
+    // Get Defender preferences
+    typeCommand("Get-MpPreference | Export-Clixml .\\defender\\defender_preferences.xml", true);
+    delay(1500);
+
+    // Get threat catalog
+    typeCommand("Get-MpThreat | Export-Csv .\\defender\\threats.csv -NoTypeInformation -ErrorAction SilentlyContinue", true);
+    delay(2000);
+
+    // Get scan history
+    typeCommand("Get-MpThreatDetection | Select-Object -First 100 | Export-Csv .\\defender\\threat_detections.csv -NoTypeInformation -ErrorAction SilentlyContinue", true);
+    delay(2000);
+
+    // Export Defender logs
+    typeCommand("wevtutil epl Microsoft-Windows-Windows Defender/Operational .\\defender\\defender_operational.evtx", true);
+    delay(3000);
+
+    logAction("WIN_DEFENDER", "Windows Defender collection complete", "SUCCESS");
+    return true;
+}
+
+bool HIDAutomation::executeWindowsFirewall() {
+    logAction("WIN_FIREWALL", "Collecting Windows Firewall configuration", "STARTED");
+
+    typeCommand("New-Item -ItemType Directory -Force -Path .\\firewall", true);
+    delay(500);
+
+    // Get firewall profiles
+    typeCommand("Get-NetFirewallProfile | Export-Csv .\\firewall\\firewall_profiles.csv -NoTypeInformation", true);
+    delay(1500);
+
+    // Get firewall rules
+    typeCommand("Get-NetFirewallRule | Export-Csv .\\firewall\\firewall_rules.csv -NoTypeInformation", true);
+    delay(3000);
+
+    // Get application rules
+    typeCommand("Get-NetFirewallApplicationFilter | Export-Csv .\\firewall\\firewall_apps.csv -NoTypeInformation", true);
+    delay(2000);
+
+    // Export firewall logs
+    typeCommand("wevtutil epl Microsoft-Windows-Windows Firewall With Advanced Security/Firewall .\\firewall\\firewall.evtx", true);
+    delay(2000);
+
+    // Get firewall settings via netsh
+    typeCommand("netsh advfirewall show allprofiles > .\\firewall\\netsh_profiles.txt", true);
+    delay(1500);
+
+    logAction("WIN_FIREWALL", "Firewall collection complete", "SUCCESS");
+    return true;
+}
+
+bool HIDAutomation::executeWindowsWLANProfiles() {
+    logAction("WIN_WLAN", "Collecting WLAN profiles and credentials", "STARTED");
+
+    typeCommand("New-Item -ItemType Directory -Force -Path .\\wlan", true);
+    delay(500);
+
+    // Get WLAN profiles
+    typeCommand("netsh wlan show profiles > .\\wlan\\wlan_profiles.txt", true);
+    delay(1500);
+
+    // Export all WLAN profiles with keys
+    typeCommand("netsh wlan export profile key=clear folder=.\\wlan", true);
+    delay(3000);
+
+    // Get WLAN interface info
+    typeCommand("netsh wlan show interfaces > .\\wlan\\wlan_interfaces.txt", true);
+    delay(1000);
+
+    // Get network list
+    typeCommand("netsh wlan show networks mode=bssid > .\\wlan\\available_networks.txt", true);
+    delay(2000);
+
+    logAction("WIN_WLAN", "WLAN profiles collection complete", "SUCCESS");
+    return true;
+}
+
+bool HIDAutomation::executeWindowsInstalledPrograms() {
+    logAction("WIN_PROGRAMS", "Collecting installed programs list", "STARTED");
+
+    typeCommand("New-Item -ItemType Directory -Force -Path .\\programs", true);
+    delay(500);
+
+    // Get installed programs via WMI
+    typeCommand("Get-WmiObject -Class Win32_Product | Select-Object Name,Version,Vendor,InstallDate | Export-Csv .\\programs\\installed_programs_wmi.csv -NoTypeInformation", true);
+    delay(10000); // WMI can be slow
+
+    // Get programs from registry (faster)
+    typeCommand("Get-ItemProperty HKLM:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\* | Select-Object DisplayName,DisplayVersion,Publisher,InstallDate | Export-Csv .\\programs\\installed_programs_reg64.csv -NoTypeInformation", true);
+    delay(2000);
+
+    typeCommand("Get-ItemProperty HKLM:\\Software\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\* | Select-Object DisplayName,DisplayVersion,Publisher,InstallDate | Export-Csv .\\programs\\installed_programs_reg32.csv -NoTypeInformation -ErrorAction SilentlyContinue", true);
+    delay(2000);
+
+    // Get StartMenu programs
+    typeCommand("Get-ChildItem 'C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs' -Recurse -File | Select-Object FullName,CreationTime,LastWriteTime | Export-Csv .\\programs\\startmenu_programs.csv -NoTypeInformation", true);
+    delay(2000);
+
+    logAction("WIN_PROGRAMS", "Installed programs collection complete", "SUCCESS");
+    return true;
+}
+
+bool HIDAutomation::executeWindowsProcessList() {
+    logAction("WIN_PROCESSES", "Collecting running processes snapshot", "STARTED");
+
+    typeCommand("New-Item -ItemType Directory -Force -Path .\\processes", true);
+    delay(500);
+
+    // Get process list with details
+    typeCommand("Get-Process | Select-Object ProcessName,Id,Path,StartTime,CPU,WorkingSet,CommandLine | Export-Csv .\\processes\\processes.csv -NoTypeInformation", true);
+    delay(2000);
+
+    // Get process owners
+    typeCommand("Get-WmiObject Win32_Process | Select-Object ProcessId,Name,CommandLine,@{n='Owner';e={$_.GetOwner().User}} | Export-Csv .\\processes\\process_owners.csv -NoTypeInformation", true);
+    delay(3000);
+
+    // Get services
+    typeCommand("Get-Service | Export-Csv .\\processes\\services_status.csv -NoTypeInformation", true);
+    delay(1500);
+
+    // Get network connections with process info
+    typeCommand("Get-NetTCPConnection | Select-Object LocalAddress,LocalPort,RemoteAddress,RemotePort,State,OwningProcess | Export-Csv .\\processes\\tcp_connections.csv -NoTypeInformation", true);
+    delay(2000);
+
+    // Tasklist with modules
+    typeCommand("tasklist /m > .\\processes\\tasklist_modules.txt", true);
+    delay(2000);
+
+    logAction("WIN_PROCESSES", "Process snapshot complete", "SUCCESS");
+    return true;
+}
+
+bool HIDAutomation::executeWindowsNetworkShares() {
+    logAction("WIN_SHARES", "Collecting network shares and mapped drives", "STARTED");
+
+    typeCommand("New-Item -ItemType Directory -Force -Path .\\shares", true);
+    delay(500);
+
+    // Get SMB shares
+    typeCommand("Get-SmbShare | Export-Csv .\\shares\\smb_shares.csv -NoTypeInformation", true);
+    delay(1500);
+
+    // Get mapped network drives
+    typeCommand("Get-PSDrive -PSProvider FileSystem | Export-Csv .\\shares\\mapped_drives.csv -NoTypeInformation", true);
+    delay(1000);
+
+    // Get net use info
+    typeCommand("net use > .\\shares\\net_use.txt", true);
+    delay(1000);
+
+    // Get SMB connections
+    typeCommand("Get-SmbConnection | Export-Csv .\\shares\\smb_connections.csv -NoTypeInformation -ErrorAction SilentlyContinue", true);
+    delay(1500);
+
+    // Get WMI network connections
+    typeCommand("Get-WmiObject Win32_NetworkConnection | Export-Csv .\\shares\\network_connections.csv -NoTypeInformation", true);
+    delay(2000);
+
+    logAction("WIN_SHARES", "Network shares collection complete", "SUCCESS");
+    return true;
+}
+
+bool HIDAutomation::executeWindowsDrivers() {
+    logAction("WIN_DRIVERS", "Collecting driver information", "STARTED");
+
+    typeCommand("New-Item -ItemType Directory -Force -Path .\\drivers", true);
+    delay(500);
+
+    // Get loaded drivers
+    typeCommand("Get-WindowsDriver -Online | Export-Csv .\\drivers\\loaded_drivers.csv -NoTypeInformation", true);
+    delay(3000);
+
+    // Get driver info via DISM
+    typeCommand("driverquery /v /fo csv > .\\drivers\\driverquery.csv", true);
+    delay(2000);
+
+    // Get PnP devices
+    typeCommand("Get-PnpDevice | Export-Csv .\\drivers\\pnp_devices.csv -NoTypeInformation", true);
+    delay(2000);
+
+    // Get device manager tree
+    typeCommand("pnputil /enum-devices > .\\drivers\\pnp_enumeration.txt", true);
+    delay(2000);
+
+    logAction("WIN_DRIVERS", "Driver collection complete", "SUCCESS");
+    return true;
+}
+
+bool HIDAutomation::executeWindowsWindowsUpdate() {
+    logAction("WIN_UPDATE", "Collecting Windows Update history", "STARTED");
+
+    typeCommand("New-Item -ItemType Directory -Force -Path .\\updates", true);
+    delay(500);
+
+    // Get installed updates
+    typeCommand("Get-HotFix | Select-Object Description,HotFixID,InstalledBy,InstalledOn | Export-Csv .\\updates\\installed_updates.csv -NoTypeInformation", true);
+    delay(3000);
+
+    // Get update history via WMI
+    typeCommand("Get-WmiObject -Class Win32_QuickFixEngineering | Export-Csv .\\updates\\updates_wmi.csv -NoTypeInformation", true);
+    delay(2000);
+
+    // Export Windows Update log
+    typeCommand("Get-WindowsUpdateLog -LogPath .\\updates\\WindowsUpdate.log -ErrorAction SilentlyContinue", true);
+    delay(5000);
+
+    logAction("WIN_UPDATE", "Windows Update history complete", "SUCCESS");
+    return true;
+}
+
+bool HIDAutomation::executeWindowsEnvironmentVars() {
+    logAction("WIN_ENV", "Collecting environment variables", "STARTED");
+
+    typeCommand("New-Item -ItemType Directory -Force -Path .\\environment", true);
+    delay(500);
+
+    // Get all environment variables
+    typeCommand("Get-ChildItem Env: | Export-Csv .\\environment\\env_vars.csv -NoTypeInformation", true);
+    delay(1000);
+
+    // System environment variables
+    typeCommand("[Environment]::GetEnvironmentVariables('Machine') | Out-File .\\environment\\system_env.txt", true);
+    delay(1000);
+
+    // User environment variables
+    typeCommand("[Environment]::GetEnvironmentVariables('User') | Out-File .\\environment\\user_env.txt", true);
+    delay(1000);
+
+    // PATH variable detailed
+    typeCommand("$env:Path -split ';' | Out-File .\\environment\\path_detailed.txt", true);
+    delay(500);
+
+    logAction("WIN_ENV", "Environment variables collection complete", "SUCCESS");
+    return true;
+}
+
+bool HIDAutomation::executeWindowsStartupPrograms() {
+    logAction("WIN_STARTUP", "Collecting startup programs", "STARTED");
+
+    typeCommand("New-Item -ItemType Directory -Force -Path .\\startup", true);
+    delay(500);
+
+    // Get startup programs via WMI
+    typeCommand("Get-CimInstance Win32_StartupCommand | Select-Object Name,Command,Location,User | Export-Csv .\\startup\\startup_wmi.csv -NoTypeInformation", true);
+    delay(2000);
+
+    // Startup folder contents
+    typeCommand("Get-ChildItem 'C:\\ProgramData\\Microsoft\\Windows\\Start Menu\\Programs\\StartUp' -Recurse | Export-Csv .\\startup\\startup_allusers.csv -NoTypeInformation -ErrorAction SilentlyContinue", true);
+    delay(1000);
+
+    typeCommand("Get-ChildItem '$env:APPDATA\\Microsoft\\Windows\\Start Menu\\Programs\\Startup' -Recurse -ErrorAction SilentlyContinue | Export-Csv .\\startup\\startup_user.csv -NoTypeInformation", true);
+    delay(1000);
+
+    logAction("WIN_STARTUP", "Startup programs collection complete", "SUCCESS");
+    return true;
+}
+
+bool HIDAutomation::executeWindowsErrorReporting() {
+    logAction("WIN_WER", "Collecting Windows Error Reporting data", "STARTED");
+
+    typeCommand("New-Item -ItemType Directory -Force -Path .\\wer", true);
+    delay(500);
+
+    // Copy WER reports
+    typeCommand("Copy-Item -Path C:\\ProgramData\\Microsoft\\Windows\\WER\\ReportQueue\\* -Destination .\\wer\\ -Recurse -ErrorAction SilentlyContinue", true);
+    delay(3000);
+
+    // Get application crash info
+    typeCommand("Get-WinEvent -LogName Application -FilterXPath '*[System[Provider[@Name=\"Application Error\"]]]' -MaxEvents 100 -ErrorAction SilentlyContinue | Export-Csv .\\wer\\app_crashes.csv -NoTypeInformation", true);
+    delay(3000);
+
+    logAction("WIN_WER", "Error reporting collection complete", "SUCCESS");
+    return true;
+}
+
+bool HIDAutomation::executeWindowsHosts() {
+    logAction("WIN_HOSTS", "Collecting hosts file", "STARTED");
+
+    typeCommand("New-Item -ItemType Directory -Force -Path .\\network_config", true);
+    delay(500);
+
+    // Copy hosts file
+    typeCommand("Copy-Item C:\\Windows\\System32\\drivers\\etc\\hosts .\\network_config\\hosts.txt", true);
+    delay(500);
+
+    // Copy other network config files
+    typeCommand("Copy-Item C:\\Windows\\System32\\drivers\\etc\\* .\\network_config\\ -ErrorAction SilentlyContinue", true);
+    delay(1000);
+
+    logAction("WIN_HOSTS", "Hosts file collection complete", "SUCCESS");
+    return true;
+}
+
+bool HIDAutomation::executeWindowsDNSCache() {
+    logAction("WIN_DNS", "Collecting DNS cache", "STARTED");
+
+    typeCommand("New-Item -ItemType Directory -Force -Path .\\dns", true);
+    delay(500);
+
+    // Get DNS cache
+    typeCommand("Get-DnsClientCache | Export-Csv .\\dns\\dns_cache.csv -NoTypeInformation", true);
+    delay(1500);
+
+    // Get DNS client settings
+    typeCommand("Get-DnsClient | Export-Csv .\\dns\\dns_client.csv -NoTypeInformation", true);
+    delay(1000);
+
+    // ipconfig /displaydns
+    typeCommand("ipconfig /displaydns > .\\dns\\ipconfig_dns.txt", true);
+    delay(1500);
+
+    logAction("WIN_DNS", "DNS cache collection complete", "SUCCESS");
+    return true;
+}
+
+bool HIDAutomation::executeWindowsCertificates() {
+    logAction("WIN_CERTS", "Collecting certificates", "STARTED");
+
+    typeCommand("New-Item -ItemType Directory -Force -Path .\\certificates", true);
+    delay(500);
+
+    // Export certificates from various stores
+    typeCommand("Get-ChildItem -Path Cert:\\LocalMachine\\My | Export-Csv .\\certificates\\machine_my.csv -NoTypeInformation", true);
+    delay(2000);
+
+    typeCommand("Get-ChildItem -Path Cert:\\LocalMachine\\Root | Export-Csv .\\certificates\\machine_root.csv -NoTypeInformation", true);
+    delay(2000);
+
+    typeCommand("Get-ChildItem -Path Cert:\\CurrentUser\\My -ErrorAction SilentlyContinue | Export-Csv .\\certificates\\user_my.csv -NoTypeInformation", true);
+    delay(2000);
+
+    typeCommand("Get-ChildItem -Path Cert:\\CurrentUser\\Root -ErrorAction SilentlyContinue | Export-Csv .\\certificates\\user_root.csv -NoTypeInformation", true);
+    delay(2000);
+
+    logAction("WIN_CERTS", "Certificates collection complete", "SUCCESS");
+    return true;
+}
+
+bool HIDAutomation::executeWindowsActivation() {
+    logAction("WIN_ACTIVATION", "Collecting Windows activation status", "STARTED");
+
+    typeCommand("New-Item -ItemType Directory -Force -Path .\\activation", true);
+    delay(500);
+
+    // Get activation status
+    typeCommand("slmgr /dli > .\\activation\\license_info.txt", true);
+    delay(2000);
+
+    // Get detailed license info
+    typeCommand("slmgr /dlv > .\\activation\\license_verbose.txt", true);
+    delay(2000);
+
+    // Get Windows version info
+    typeCommand("Get-ComputerInfo | Select-Object WindowsProductName,WindowsVersion,WindowsBuildLabEx,OsArchitecture | Export-Csv .\\activation\\windows_version.csv -NoTypeInformation", true);
+    delay(2000);
+
+    logAction("WIN_ACTIVATION", "Activation status collection complete", "SUCCESS");
+    return true;
+}
+
 bool HIDAutomation::automateLinuxForensics() {
     logAction("LNX_AUTO_START", "Starting Linux forensics automation", "STARTED");
 
@@ -1815,6 +2184,373 @@ bool HIDAutomation::executeLinuxTimezone() {
     return true;
 }
 
+bool HIDAutomation::executeLinuxProcessList() {
+    logAction("LNX_PROCESSES", "Collecting running processes", "STARTED");
+
+    typeCommand("mkdir -p processes", true);
+    delay(300);
+
+    // Detailed process list
+    typeCommand("ps auxwwf > processes/ps_tree.txt 2>&1", true);
+    delay(1000);
+    logAction("LNX_PROCESSES", "Process tree collected", "SUCCESS");
+
+    typeCommand("ps -eo pid,ppid,user,uid,gid,pri,ni,vsz,rss,tty,stat,start,time,cmd > processes/ps_detailed.txt 2>&1", true);
+    delay(1000);
+
+    // Top processes snapshot
+    typeCommand("top -b -n 1 > processes/top_snapshot.txt 2>&1", true);
+    delay(1000);
+
+    // Process tree via pstree
+    typeCommand("pstree -aplsun > processes/pstree.txt 2>&1", true);
+    delay(500);
+
+    logAction("LNX_PROCESSES", "Process list collection complete", "SUCCESS");
+    return true;
+}
+
+bool HIDAutomation::executeLinuxOpenFiles() {
+    logAction("LNX_OPENFILES", "Collecting open files", "STARTED");
+
+    typeCommand("mkdir -p open_files", true);
+    delay(300);
+
+    // List open files
+    typeCommand("sudo lsof > open_files/lsof_all.txt 2>&1", true);
+    delay(3000);
+    logAction("LNX_OPENFILES", "Open files collected", "SUCCESS");
+
+    // Network files
+    typeCommand("sudo lsof -i > open_files/lsof_network.txt 2>&1", true);
+    delay(1000);
+
+    // Files by user
+    typeCommand("sudo lsof -u root > open_files/lsof_root.txt 2>&1", true);
+    delay(1000);
+
+    logAction("LNX_OPENFILES", "Open files collection complete", "SUCCESS");
+    return true;
+}
+
+bool HIDAutomation::executeLinuxEnvironmentVars() {
+    logAction("LNX_ENV", "Collecting environment variables", "STARTED");
+
+    typeCommand("mkdir -p environment", true);
+    delay(300);
+
+    // Current environment
+    typeCommand("env > environment/env.txt 2>&1", true);
+    delay(300);
+
+    typeCommand("export > environment/export.txt 2>&1", true);
+    delay(300);
+
+    // System-wide environment
+    typeCommand("sudo cat /etc/environment > environment/system_env.txt 2>&1", true);
+    delay(300);
+
+    typeCommand("sudo cat /etc/profile > environment/profile.txt 2>&1", true);
+    delay(300);
+
+    logAction("LNX_ENV", "Environment variables collected", "SUCCESS");
+    return true;
+}
+
+bool HIDAutomation::executeLinuxSysctl() {
+    logAction("LNX_SYSCTL", "Collecting kernel parameters", "STARTED");
+
+    typeCommand("mkdir -p sysctl", true);
+    delay(300);
+
+    // All kernel parameters
+    typeCommand("sudo sysctl -a > sysctl/sysctl_all.txt 2>&1", true);
+    delay(2000);
+    logAction("LNX_SYSCTL", "Kernel parameters collected", "SUCCESS");
+
+    // Network parameters
+    typeCommand("sudo sysctl net > sysctl/sysctl_net.txt 2>&1", true);
+    delay(500);
+
+    // Kernel parameters
+    typeCommand("sudo sysctl kernel > sysctl/sysctl_kernel.txt 2>&1", true);
+    delay(500);
+
+    logAction("LNX_SYSCTL", "Sysctl collection complete", "SUCCESS");
+    return true;
+}
+
+bool HIDAutomation::executeLinuxSELinux() {
+    logAction("LNX_SELINUX", "Collecting SELinux/AppArmor status", "STARTED");
+
+    typeCommand("mkdir -p security", true);
+    delay(300);
+
+    // SELinux status
+    typeCommand("sestatus > security/selinux_status.txt 2>&1", true);
+    delay(500);
+
+    typeCommand("getenforce > security/selinux_mode.txt 2>&1", true);
+    delay(300);
+
+    // AppArmor status
+    typeCommand("sudo aa-status > security/apparmor_status.txt 2>&1", true);
+    delay(500);
+    logAction("LNX_SELINUX", "Security module status collected", "SUCCESS");
+
+    // Security policies
+    typeCommand("sudo cp /etc/selinux/config security/ 2>/dev/null", true);
+    delay(300);
+
+    logAction("LNX_SELINUX", "SELinux/AppArmor collection complete", "SUCCESS");
+    return true;
+}
+
+bool HIDAutomation::executeLinuxSystemdServices() {
+    logAction("LNX_SYSTEMD", "Collecting systemd services", "STARTED");
+
+    typeCommand("mkdir -p systemd", true);
+    delay(300);
+
+    // List all services
+    typeCommand("systemctl list-units --type=service --all > systemd/services_all.txt 2>&1", true);
+    delay(1500);
+    logAction("LNX_SYSTEMD", "Service list collected", "SUCCESS");
+
+    // Failed services
+    typeCommand("systemctl --failed > systemd/services_failed.txt 2>&1", true);
+    delay(500);
+
+    // Enabled services
+    typeCommand("systemctl list-unit-files --type=service --state=enabled > systemd/services_enabled.txt 2>&1", true);
+    delay(1000);
+
+    // Service dependencies
+    typeCommand("systemctl list-dependencies > systemd/service_dependencies.txt 2>&1", true);
+    delay(1000);
+
+    logAction("LNX_SYSTEMD", "Systemd services collection complete", "SUCCESS");
+    return true;
+}
+
+bool HIDAutomation::executeLinuxMountedFilesystems() {
+    logAction("LNX_MOUNTS", "Collecting mounted filesystems", "STARTED");
+
+    typeCommand("mkdir -p mounts", true);
+    delay(300);
+
+    // Mount information
+    typeCommand("mount > mounts/mount.txt 2>&1", true);
+    delay(500);
+    logAction("LNX_MOUNTS", "Mount information collected", "SUCCESS");
+
+    typeCommand("cat /proc/mounts > mounts/proc_mounts.txt 2>&1", true);
+    delay(300);
+
+    typeCommand("cat /etc/fstab > mounts/fstab.txt 2>&1", true);
+    delay(300);
+
+    // Disk usage
+    typeCommand("df -h > mounts/df_human.txt 2>&1", true);
+    delay(500);
+
+    typeCommand("df -i > mounts/df_inodes.txt 2>&1", true);
+    delay(500);
+
+    logAction("LNX_MOUNTS", "Mounted filesystems collection complete", "SUCCESS");
+    return true;
+}
+
+bool HIDAutomation::executeLinuxLoginHistory() {
+    logAction("LNX_LOGINS", "Collecting login history", "STARTED");
+
+    typeCommand("mkdir -p login_history", true);
+    delay(300);
+
+    // Last logins
+    typeCommand("last -Faixw > login_history/last.txt 2>&1", true);
+    delay(1000);
+    logAction("LNX_LOGINS", "Last logins collected", "SUCCESS");
+
+    // Failed logins
+    typeCommand("sudo lastb -Faixw > login_history/lastb.txt 2>&1", true);
+    delay(1000);
+
+    // Currently logged in users
+    typeCommand("w > login_history/w.txt 2>&1", true);
+    delay(300);
+
+    typeCommand("who -a > login_history/who.txt 2>&1", true);
+    delay(300);
+
+    // Login records
+    typeCommand("sudo lastlog > login_history/lastlog.txt 2>&1", true);
+    delay(500);
+
+    logAction("LNX_LOGINS", "Login history collection complete", "SUCCESS");
+    return true;
+}
+
+bool HIDAutomation::executeLinuxHostsFile() {
+    logAction("LNX_HOSTS", "Collecting hosts file", "STARTED");
+
+    typeCommand("mkdir -p network_config", true);
+    delay(300);
+
+    // Hosts file
+    typeCommand("cat /etc/hosts > network_config/hosts.txt 2>&1", true);
+    delay(300);
+    logAction("LNX_HOSTS", "Hosts file collected", "SUCCESS");
+
+    typeCommand("cat /etc/hostname > network_config/hostname.txt 2>&1", true);
+    delay(300);
+
+    logAction("LNX_HOSTS", "Hosts file collection complete", "SUCCESS");
+    return true;
+}
+
+bool HIDAutomation::executeLinuxResolverConfig() {
+    logAction("LNX_RESOLVER", "Collecting DNS resolver configuration", "STARTED");
+
+    typeCommand("mkdir -p dns_config", true);
+    delay(300);
+
+    // Resolv.conf
+    typeCommand("cat /etc/resolv.conf > dns_config/resolv.conf 2>&1", true);
+    delay(300);
+    logAction("LNX_RESOLVER", "Resolver config collected", "SUCCESS");
+
+    // systemd-resolved
+    typeCommand("systemd-resolve --status > dns_config/resolved_status.txt 2>&1", true);
+    delay(500);
+
+    typeCommand("cat /etc/nsswitch.conf > dns_config/nsswitch.conf 2>&1", true);
+    delay(300);
+
+    logAction("LNX_RESOLVER", "DNS resolver collection complete", "SUCCESS");
+    return true;
+}
+
+bool HIDAutomation::executeLinuxNetworkInterfaces() {
+    logAction("LNX_INTERFACES", "Collecting network interface details", "STARTED");
+
+    typeCommand("mkdir -p network_interfaces", true);
+    delay(300);
+
+    // Interface information
+    typeCommand("ip addr show > network_interfaces/ip_addr.txt 2>&1", true);
+    delay(500);
+    logAction("LNX_INTERFACES", "IP addresses collected", "SUCCESS");
+
+    typeCommand("ip link show > network_interfaces/ip_link.txt 2>&1", true);
+    delay(500);
+
+    typeCommand("ifconfig -a > network_interfaces/ifconfig.txt 2>&1", true);
+    delay(500);
+
+    // Interface statistics
+    typeCommand("ip -s link > network_interfaces/ip_stats.txt 2>&1", true);
+    delay(500);
+
+    typeCommand("cat /proc/net/dev > network_interfaces/proc_net_dev.txt 2>&1", true);
+    delay(300);
+
+    logAction("LNX_INTERFACES", "Network interfaces collection complete", "SUCCESS");
+    return true;
+}
+
+bool HIDAutomation::executeLinuxRoutingTable() {
+    logAction("LNX_ROUTING", "Collecting routing tables", "STARTED");
+
+    typeCommand("mkdir -p routing", true);
+    delay(300);
+
+    // Routing tables
+    typeCommand("ip route show > routing/ip_route.txt 2>&1", true);
+    delay(500);
+    logAction("LNX_ROUTING", "IP routes collected", "SUCCESS");
+
+    typeCommand("route -n > routing/route.txt 2>&1", true);
+    delay(500);
+
+    // IPv6 routes
+    typeCommand("ip -6 route show > routing/ip6_route.txt 2>&1", true);
+    delay(500);
+
+    typeCommand("netstat -rn > routing/netstat_routes.txt 2>&1", true);
+    delay(500);
+
+    logAction("LNX_ROUTING", "Routing table collection complete", "SUCCESS");
+    return true;
+}
+
+bool HIDAutomation::executeLinuxARPCache() {
+    logAction("LNX_ARP", "Collecting ARP cache", "STARTED");
+
+    typeCommand("mkdir -p arp", true);
+    delay(300);
+
+    // ARP table
+    typeCommand("arp -a > arp/arp.txt 2>&1", true);
+    delay(500);
+    logAction("LNX_ARP", "ARP table collected", "SUCCESS");
+
+    typeCommand("ip neigh show > arp/ip_neigh.txt 2>&1", true);
+    delay(500);
+
+    typeCommand("cat /proc/net/arp > arp/proc_net_arp.txt 2>&1", true);
+    delay(300);
+
+    logAction("LNX_ARP", "ARP cache collection complete", "SUCCESS");
+    return true;
+}
+
+bool HIDAutomation::executeLinuxXorgLogs() {
+    logAction("LNX_XORG", "Collecting X11/Xorg logs", "STARTED");
+
+    typeCommand("mkdir -p xorg", true);
+    delay(300);
+
+    // X11 logs
+    typeCommand("sudo cp /var/log/Xorg.*.log xorg/ 2>/dev/null", true);
+    delay(500);
+    logAction("LNX_XORG", "Xorg logs collected", "SUCCESS");
+
+    // X authority
+    typeCommand("xauth list > xorg/xauth.txt 2>&1", true);
+    delay(300);
+
+    // Display info
+    typeCommand("echo $DISPLAY > xorg/display.txt 2>&1", true);
+    delay(100);
+
+    logAction("LNX_XORG", "X11 logs collection complete", "SUCCESS");
+    return true;
+}
+
+bool HIDAutomation::executeLinuxBashHistory() {
+    logAction("LNX_BASH_HISTORY", "Collecting bash history for all users", "STARTED");
+
+    typeCommand("mkdir -p bash_history", true);
+    delay(300);
+
+    // Current user history
+    typeCommand("cat ~/.bash_history > bash_history/bash_history_current.txt 2>&1", true);
+    delay(500);
+    logAction("LNX_BASH_HISTORY", "Current user history collected", "SUCCESS");
+
+    // Root history
+    typeCommand("sudo cat /root/.bash_history > bash_history/bash_history_root.txt 2>&1", true);
+    delay(500);
+
+    // All user histories
+    typeCommand("sudo find /home -name '.bash_history' -exec cat {} \\; > bash_history/all_users_history.txt 2>&1", true);
+    delay(2000);
+
+    logAction("LNX_BASH_HISTORY", "Bash history collection complete", "SUCCESS");
+    return true;
+}
+
 bool HIDAutomation::automateMacOSForensics() {
     logAction("MAC_AUTO_START", "Starting macOS forensics automation", "STARTED");
 
@@ -2359,6 +3095,348 @@ bool HIDAutomation::executeMacOSTimeMachine() {
     delay(3000);
 
     logAction("MAC_TM", "Time Machine collection complete", "SUCCESS");
+    return true;
+}
+
+bool HIDAutomation::executeMacOSProcessList() {
+    logAction("MAC_PROCESSES", "Collecting running processes", "STARTED");
+
+    typeCommand("mkdir -p processes", true);
+    delay(300);
+
+    // Process list
+    typeCommand("ps auxwww > processes/ps_all.txt 2>&1", true);
+    delay(1000);
+    logAction("MAC_PROCESSES", "Process list collected", "SUCCESS");
+
+    // Top snapshot
+    typeCommand("top -l 1 > processes/top_snapshot.txt 2>&1", true);
+    delay(1000);
+
+    // Activity Monitor info
+    typeCommand("ps -eo pid,ppid,user,uid,gid,pri,nice,vsz,rss,tty,stat,start,time,comm > processes/ps_detailed.txt 2>&1", true);
+    delay(1000);
+
+    logAction("MAC_PROCESSES", "Process list collection complete", "SUCCESS");
+    return true;
+}
+
+bool HIDAutomation::executeMacOSOpenFiles() {
+    logAction("MAC_OPENFILES", "Collecting open files", "STARTED");
+
+    typeCommand("mkdir -p open_files", true);
+    delay(300);
+
+    // Open files
+    typeCommand("sudo lsof > open_files/lsof_all.txt 2>&1", true);
+    delay(3000);
+    logAction("MAC_OPENFILES", "Open files collected", "SUCCESS");
+
+    // Network connections
+    typeCommand("sudo lsof -i > open_files/lsof_network.txt 2>&1", true);
+    delay(1500);
+
+    logAction("MAC_OPENFILES", "Open files collection complete", "SUCCESS");
+    return true;
+}
+
+bool HIDAutomation::executeMacOSNetworkConnections() {
+    logAction("MAC_NETCON", "Collecting network connections", "STARTED");
+
+    typeCommand("mkdir -p network_connections", true);
+    delay(300);
+
+    // Network connections
+    typeCommand("netstat -an > network_connections/netstat.txt 2>&1", true);
+    delay(1000);
+    logAction("MAC_NETCON", "Network connections collected", "SUCCESS");
+
+    // Established connections
+    typeCommand("lsof -i -n -P | grep ESTABLISHED > network_connections/established.txt 2>&1", true);
+    delay(1000);
+
+    // Listening ports
+    typeCommand("lsof -i -n -P | grep LISTEN > network_connections/listening.txt 2>&1", true);
+    delay(1000);
+
+    logAction("MAC_NETCON", "Network connections collection complete", "SUCCESS");
+    return true;
+}
+
+bool HIDAutomation::executeMacOSKernelExtensions() {
+    logAction("MAC_KEXTS", "Collecting kernel extensions", "STARTED");
+
+    typeCommand("mkdir -p kexts", true);
+    delay(300);
+
+    // Loaded kernel extensions
+    typeCommand("kextstat > kexts/kextstat.txt 2>&1", true);
+    delay(1000);
+    logAction("MAC_KEXTS", "Kernel extensions list collected", "SUCCESS");
+
+    // Kext information
+    typeCommand("kextfind -report -b -loadable > kexts/kextfind.txt 2>&1", true);
+    delay(2000);
+
+    // System extensions
+    typeCommand("systemextensionsctl list > kexts/system_extensions.txt 2>&1", true);
+    delay(1000);
+
+    logAction("MAC_KEXTS", "Kernel extensions collection complete", "SUCCESS");
+    return true;
+}
+
+bool HIDAutomation::executeMacOSLoginHistory() {
+    logAction("MAC_LOGINS", "Collecting login history", "STARTED");
+
+    typeCommand("mkdir -p login_history", true);
+    delay(300);
+
+    // Last logins
+    typeCommand("last > login_history/last.txt 2>&1", true);
+    delay(1000);
+    logAction("MAC_LOGINS", "Last logins collected", "SUCCESS");
+
+    // Currently logged in users
+    typeCommand("w > login_history/w.txt 2>&1", true);
+    delay(300);
+
+    typeCommand("who > login_history/who.txt 2>&1", true);
+    delay(300);
+
+    // Login history from logs
+    typeCommand("log show --predicate 'eventMessage contains \"login\"' --info --last 7d > login_history/login_logs.txt 2>&1", true);
+    delay(5000);
+
+    logAction("MAC_LOGINS", "Login history collection complete", "SUCCESS");
+    return true;
+}
+
+bool HIDAutomation::executeMacOSFileVault() {
+    logAction("MAC_FILEVAULT", "Collecting FileVault status", "STARTED");
+
+    typeCommand("mkdir -p filevault", true);
+    delay(300);
+
+    // FileVault status
+    typeCommand("fdesetup status > filevault/fv_status.txt 2>&1", true);
+    delay(1000);
+    logAction("MAC_FILEVAULT", "FileVault status collected", "SUCCESS");
+
+    // FileVault users
+    typeCommand("sudo fdesetup list > filevault/fv_users.txt 2>&1", true);
+    delay(1000);
+
+    // Core Storage info
+    typeCommand("diskutil cs list > filevault/cs_list.txt 2>&1", true);
+    delay(1000);
+
+    logAction("MAC_FILEVAULT", "FileVault collection complete", "SUCCESS");
+    return true;
+}
+
+bool HIDAutomation::executeMacOSGatekeeper() {
+    logAction("MAC_GATEKEEPER", "Collecting Gatekeeper status", "STARTED");
+
+    typeCommand("mkdir -p gatekeeper", true);
+    delay(300);
+
+    // Gatekeeper status
+    typeCommand("spctl --status > gatekeeper/gatekeeper_status.txt 2>&1", true);
+    delay(500);
+    logAction("MAC_GATEKEEPER", "Gatekeeper status collected", "SUCCESS");
+
+    // Gatekeeper assessments
+    typeCommand("spctl --list > gatekeeper/gatekeeper_list.txt 2>&1", true);
+    delay(1000);
+
+    // XProtect info
+    typeCommand("system_profiler SPInstallHistoryDataType | grep -i xprotect > gatekeeper/xprotect.txt 2>&1", true);
+    delay(1000);
+
+    logAction("MAC_GATEKEEPER", "Gatekeeper collection complete", "SUCCESS");
+    return true;
+}
+
+bool HIDAutomation::executeMacOSSIP() {
+    logAction("MAC_SIP", "Collecting System Integrity Protection status", "STARTED");
+
+    typeCommand("mkdir -p sip", true);
+    delay(300);
+
+    // SIP status
+    typeCommand("csrutil status > sip/sip_status.txt 2>&1", true);
+    delay(500);
+    logAction("MAC_SIP", "SIP status collected", "SUCCESS");
+
+    // Secure Boot level
+    typeCommand("nvram -p | grep SecureBootLevel > sip/secure_boot.txt 2>&1", true);
+    delay(500);
+
+    logAction("MAC_SIP", "SIP collection complete", "SUCCESS");
+    return true;
+}
+
+bool HIDAutomation::executeMacOSAirportNetworks() {
+    logAction("MAC_AIRPORT", "Collecting WiFi network information", "STARTED");
+
+    typeCommand("mkdir -p airport", true);
+    delay(300);
+
+    // Airport info
+    typeCommand("/System/Library/PrivateFrameworks/Apple80211.framework/Versions/Current/Resources/airport -I > airport/airport_info.txt 2>&1", true);
+    delay(1000);
+    logAction("MAC_AIRPORT", "Airport info collected", "SUCCESS");
+
+    // WiFi scan
+    typeCommand("/System/Library/PrivateFrameworks/Apple80211.framework/Versions/Current/Resources/airport -s > airport/wifi_scan.txt 2>&1", true);
+    delay(2000);
+
+    // Preferred networks
+    typeCommand("networksetup -listpreferredwirelessnetworks en0 > airport/preferred_networks.txt 2>&1", true);
+    delay(1000);
+
+    // WiFi history
+    typeCommand("sudo cp /Library/Preferences/SystemConfiguration/com.apple.airport.preferences.plist airport/ 2>/dev/null", true);
+    delay(500);
+
+    logAction("MAC_AIRPORT", "Airport/WiFi collection complete", "SUCCESS");
+    return true;
+}
+
+bool HIDAutomation::executeMacOSBluetoothDevices() {
+    logAction("MAC_BLUETOOTH", "Collecting Bluetooth device information", "STARTED");
+
+    typeCommand("mkdir -p bluetooth", true);
+    delay(300);
+
+    // Bluetooth devices
+    typeCommand("system_profiler SPBluetoothDataType > bluetooth/bluetooth_devices.txt 2>&1", true);
+    delay(2000);
+    logAction("MAC_BLUETOOTH", "Bluetooth devices collected", "SUCCESS");
+
+    // Bluetooth preferences
+    typeCommand("sudo cp /Library/Preferences/com.apple.Bluetooth.plist bluetooth/ 2>/dev/null", true);
+    delay(500);
+
+    logAction("MAC_BLUETOOTH", "Bluetooth collection complete", "SUCCESS");
+    return true;
+}
+
+bool HIDAutomation::executeMacOSMountedVolumes() {
+    logAction("MAC_VOLUMES", "Collecting mounted volumes", "STARTED");
+
+    typeCommand("mkdir -p volumes", true);
+    delay(300);
+
+    // Mounted volumes
+    typeCommand("mount > volumes/mount.txt 2>&1", true);
+    delay(500);
+    logAction("MAC_VOLUMES", "Mounted volumes collected", "SUCCESS");
+
+    // Diskutil list
+    typeCommand("diskutil list > volumes/diskutil_list.txt 2>&1", true);
+    delay(1000);
+
+    // Volume info
+    typeCommand("diskutil info / > volumes/root_volume.txt 2>&1", true);
+    delay(500);
+
+    // Network shares
+    typeCommand("mount | grep smbfs > volumes/smb_mounts.txt 2>&1", true);
+    delay(300);
+
+    typeCommand("mount | grep nfs > volumes/nfs_mounts.txt 2>&1", true);
+    delay(300);
+
+    logAction("MAC_VOLUMES", "Mounted volumes collection complete", "SUCCESS");
+    return true;
+}
+
+bool HIDAutomation::executeMacOSLaunchDaemons() {
+    logAction("MAC_DAEMONS", "Collecting Launch Daemons", "STARTED");
+
+    typeCommand("mkdir -p launch_daemons", true);
+    delay(300);
+
+    // System Launch Daemons
+    typeCommand("sudo ls -la /Library/LaunchDaemons/ > launch_daemons/system_daemons_list.txt 2>&1", true);
+    delay(500);
+    logAction("MAC_DAEMONS", "Launch Daemons list collected", "SUCCESS");
+
+    typeCommand("sudo cp /Library/LaunchDaemons/* launch_daemons/ 2>/dev/null", true);
+    delay(2000);
+
+    // Loaded launch services
+    typeCommand("launchctl list > launch_daemons/launchctl_list.txt 2>&1", true);
+    delay(1000);
+
+    logAction("MAC_DAEMONS", "Launch Daemons collection complete", "SUCCESS");
+    return true;
+}
+
+bool HIDAutomation::executeMacOSUserDefaults() {
+    logAction("MAC_DEFAULTS", "Collecting user defaults/preferences", "STARTED");
+
+    typeCommand("mkdir -p user_defaults", true);
+    delay(300);
+
+    // Global preferences
+    typeCommand("defaults read > user_defaults/defaults_all.txt 2>&1", true);
+    delay(2000);
+    logAction("MAC_DEFAULTS", "User defaults collected", "SUCCESS");
+
+    // Dock preferences
+    typeCommand("defaults read com.apple.dock > user_defaults/dock_prefs.txt 2>&1", true);
+    delay(500);
+
+    // Finder preferences
+    typeCommand("defaults read com.apple.finder > user_defaults/finder_prefs.txt 2>&1", true);
+    delay(500);
+
+    // Safari preferences
+    typeCommand("defaults read com.apple.Safari > user_defaults/safari_prefs.txt 2>&1", true);
+    delay(500);
+
+    logAction("MAC_DEFAULTS", "User defaults collection complete", "SUCCESS");
+    return true;
+}
+
+bool HIDAutomation::executeMacOSRecentItems() {
+    logAction("MAC_RECENT", "Collecting recent items", "STARTED");
+
+    typeCommand("mkdir -p recent_items", true);
+    delay(300);
+
+    // Recent items
+    typeCommand("sudo cp ~/Library/Application\\ Support/com.apple.sharedfilelist/*.sfl recent_items/ 2>/dev/null", true);
+    delay(1000);
+    logAction("MAC_RECENT", "Recent items collected", "SUCCESS");
+
+    // Recent applications
+    typeCommand("defaults read com.apple.recentitems > recent_items/recent_apps.txt 2>&1", true);
+    delay(500);
+
+    logAction("MAC_RECENT", "Recent items collection complete", "SUCCESS");
+    return true;
+}
+
+bool HIDAutomation::executeMacOSNotificationCenter() {
+    logAction("MAC_NOTIFICATIONS", "Collecting Notification Center data", "STARTED");
+
+    typeCommand("mkdir -p notifications", true);
+    delay(300);
+
+    // Notification database
+    typeCommand("sudo cp ~/Library/Application\\ Support/NotificationCenter/* notifications/ 2>/dev/null", true);
+    delay(1000);
+    logAction("MAC_NOTIFICATIONS", "Notification data collected", "SUCCESS");
+
+    // Notification preferences
+    typeCommand("defaults read com.apple.notificationcenterui > notifications/nc_prefs.txt 2>&1", true);
+    delay(500);
+
+    logAction("MAC_NOTIFICATIONS", "Notification Center collection complete", "SUCCESS");
     return true;
 }
 
