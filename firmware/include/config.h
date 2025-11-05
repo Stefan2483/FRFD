@@ -5,7 +5,7 @@
 
 // Device Information
 #define DEVICE_NAME "FRFD"
-#define FIRMWARE_VERSION "0.9.5-beta"
+#define FIRMWARE_VERSION "1.0.0-rc1"
 #define HARDWARE_VERSION "Lilygo T-Dongle S3"
 
 // Display Configuration (ST7735 - 80x160 pixels)
