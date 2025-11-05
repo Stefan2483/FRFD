@@ -91,6 +91,12 @@ namespace Modules {
         const String MFT = "win_mft";
         const String USER_FILES = "win_user_files";
         const String RECYCLE_BIN = "win_recycle";
+        const String SHIMCACHE = "win_shimcache";
+        const String AMCACHE = "win_amcache";
+        const String JUMPLISTS = "win_jumplists";
+        const String WMI = "win_wmi";
+        const String USB_HISTORY = "win_usb";
+        const String PS_HISTORY = "win_powershell";
     }
 
     // Linux modules
@@ -105,6 +111,9 @@ namespace Modules {
         const String USER_ACCOUNTS = "lnx_users";
         const String DOCKER = "lnx_docker";
         const String BROWSER_HISTORY = "lnx_browser";
+        const String SYSTEMD_JOURNAL = "lnx_journal";
+        const String FIREWALL = "lnx_firewall";
+        const String CRON = "lnx_cron";
     }
 
     // macOS modules
@@ -116,6 +125,9 @@ namespace Modules {
         const String BROWSER_HISTORY = "mac_browser";
         const String SPOTLIGHT = "mac_spotlight";
         const String USER_ACCOUNTS = "mac_users";
+        const String QUARANTINE = "mac_quarantine";
+        const String INSTALL_HISTORY = "mac_install";
+        const String KEYCHAIN = "mac_keychain";
     }
 }
 

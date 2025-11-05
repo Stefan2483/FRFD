@@ -167,6 +167,13 @@ public:
     bool executeWindowsBrowserHistory();
     bool executeWindowsMFT();
     bool executeWindowsUserFiles();
+    bool executeWindowsShimCache();
+    bool executeWindowsAmCache();
+    bool executeWindowsRecycleBin();
+    bool executeWindowsJumpLists();
+    bool executeWindowsWMIPersistence();
+    bool executeWindowsUSBHistory();
+    bool executeWindowsPowerShellHistory();
 
     // Linux Automation
     bool executeLinuxSystemInfo();
@@ -178,6 +185,10 @@ public:
     bool executeLinuxSSHConfig();
     bool executeLinuxBrowserHistory();
     bool executeLinuxUserAccounts();
+    bool executeLinuxDocker();
+    bool executeLinuxSystemdJournal();
+    bool executeLinuxFirewallRules();
+    bool executeLinuxCronJobs();
 
     // macOS Automation
     bool executeMacOSSystemInfo();
@@ -185,6 +196,10 @@ public:
     bool executeMacOSUnifiedLogs();
     bool executeMacOSFSEvents();
     bool executeMacOSBrowserHistory();
+    bool executeMacOSSpotlight();
+    bool executeMacOSQuarantine();
+    bool executeMacOSInstallHistory();
+    bool executeMacOSKeychain();
 
     // Forensic Logging
     void logAction(const String& action_type, const String& command, const String& result);

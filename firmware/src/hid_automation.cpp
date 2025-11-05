@@ -781,6 +781,169 @@ bool HIDAutomation::executeWindowsUserFiles() {
     return true;
 }
 
+bool HIDAutomation::executeWindowsShimCache() {
+    logAction("WIN_SHIMCACHE", "Collecting ShimCache (AppCompatCache) data", "STARTED");
+
+    typeCommand("New-Item -ItemType Directory -Force -Path .\\shimcache", true);
+    delay(500);
+
+    // Export ShimCache from registry
+    typeCommand("reg export 'HKLM\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\AppCompatCache' .\\shimcache\\AppCompatCache.reg /y", true);
+    delay(2000);
+    logAction("WIN_SHIMCACHE", "AppCompatCache exported", "SUCCESS");
+
+    // Get ShimCache entries using PowerShell
+    String shimcache_cmd = "@'\r\n";
+    shimcache_cmd += "Get-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Control\\Session Manager\\AppCompatCache' | ";
+    shimcache_cmd += "Select-Object * | Out-File .\\shimcache\\shimcache_data.txt\r\n'@ | ";
+    shimcache_cmd += "Invoke-Expression";
+    typeCommand(shimcache_cmd, true);
+    delay(1500);
+
+    logAction("WIN_SHIMCACHE", "ShimCache collection complete", "SUCCESS");
+    return true;
+}
+
+bool HIDAutomation::executeWindowsAmCache() {
+    logAction("WIN_AMCACHE", "Collecting AmCache data", "STARTED");
+
+    typeCommand("New-Item -ItemType Directory -Force -Path .\\amcache", true);
+    delay(500);
+
+    // Copy AmCache hive
+    typeCommand("Copy-Item C:\\Windows\\AppCompat\\Programs\\Amcache.hve .\\amcache\\Amcache.hve -Force -ErrorAction SilentlyContinue", true);
+    delay(3000);
+    logAction("WIN_AMCACHE", "Amcache.hve copied", "SUCCESS");
+
+    // Export BAM (Background Activity Moderator)
+    typeCommand("reg save HKLM\\SYSTEM\\CurrentControlSet\\Services\\bam .\\amcache\\BAM.hive /y 2>$null", true);
+    delay(1500);
+    logAction("WIN_AMCACHE", "BAM exported", "SUCCESS");
+
+    logAction("WIN_AMCACHE", "AmCache collection complete", "SUCCESS");
+    return true;
+}
+
+bool HIDAutomation::executeWindowsRecycleBin() {
+    logAction("WIN_RECYCLEBIN", "Collecting Recycle Bin artifacts", "STARTED");
+
+    typeCommand("New-Item -ItemType Directory -Force -Path .\\recyclebin", true);
+    delay(500);
+
+    // Get Recycle Bin metadata
+    typeCommand("Get-ChildItem 'C:\\$Recycle.Bin' -Recurse -Force -ErrorAction SilentlyContinue | Select-Object FullName, Length, CreationTime, LastWriteTime | Export-Csv .\\recyclebin\\recyclebin_metadata.csv -NoTypeInformation", true);
+    delay(5000);
+    logAction("WIN_RECYCLEBIN", "Recycle Bin metadata collected", "SUCCESS");
+
+    // Copy $I files (metadata)
+    typeCommand("Copy-Item \"C:\\$Recycle.Bin\\*\\$I*\" .\\recyclebin\\ -Force -Recurse -ErrorAction SilentlyContinue", true);
+    delay(2000);
+
+    logAction("WIN_RECYCLEBIN", "Recycle Bin collection complete", "SUCCESS");
+    return true;
+}
+
+bool HIDAutomation::executeWindowsJumpLists() {
+    logAction("WIN_JUMPLISTS", "Collecting Jump Lists", "STARTED");
+
+    typeCommand("New-Item -ItemType Directory -Force -Path .\\jumplists", true);
+    delay(500);
+
+    // Automatic Jump Lists
+    typeCommand("Copy-Item \"$env:APPDATA\\Microsoft\\Windows\\Recent\\AutomaticDestinations\\*\" .\\jumplists\\AutomaticDestinations\\ -Force -Recurse -ErrorAction SilentlyContinue", true);
+    delay(3000);
+    logAction("WIN_JUMPLISTS", "Automatic Jump Lists copied", "SUCCESS");
+
+    // Custom Jump Lists
+    typeCommand("Copy-Item \"$env:APPDATA\\Microsoft\\Windows\\Recent\\CustomDestinations\\*\" .\\jumplists\\CustomDestinations\\ -Force -Recurse -ErrorAction SilentlyContinue", true);
+    delay(2000);
+    logAction("WIN_JUMPLISTS", "Custom Jump Lists copied", "SUCCESS");
+
+    // Get metadata
+    typeCommand("Get-ChildItem .\\jumplists -Recurse | Select-Object FullName, Length, CreationTime, LastWriteTime | Export-Csv .\\jumplists\\jumplists_metadata.csv -NoTypeInformation", true);
+    delay(1000);
+
+    logAction("WIN_JUMPLISTS", "Jump Lists collection complete", "SUCCESS");
+    return true;
+}
+
+bool HIDAutomation::executeWindowsWMIPersistence() {
+    logAction("WIN_WMI", "Collecting WMI persistence artifacts", "STARTED");
+
+    typeCommand("New-Item -ItemType Directory -Force -Path .\\wmi", true);
+    delay(500);
+
+    // WMI Event Consumers
+    typeCommand("Get-WMIObject -Namespace root\\Subscription -Class __EventConsumer | Export-Csv .\\wmi\\wmi_event_consumers.csv -NoTypeInformation", true);
+    delay(2000);
+    logAction("WIN_WMI", "WMI Event Consumers collected", "SUCCESS");
+
+    // WMI Event Filters
+    typeCommand("Get-WMIObject -Namespace root\\Subscription -Class __EventFilter | Export-Csv .\\wmi\\wmi_event_filters.csv -NoTypeInformation", true);
+    delay(2000);
+    logAction("WIN_WMI", "WMI Event Filters collected", "SUCCESS");
+
+    // WMI Bindings
+    typeCommand("Get-WMIObject -Namespace root\\Subscription -Class __FilterToConsumerBinding | Export-Csv .\\wmi\\wmi_bindings.csv -NoTypeInformation", true);
+    delay(2000);
+    logAction("WIN_WMI", "WMI Bindings collected", "SUCCESS");
+
+    logAction("WIN_WMI", "WMI persistence collection complete", "SUCCESS");
+    return true;
+}
+
+bool HIDAutomation::executeWindowsUSBHistory() {
+    logAction("WIN_USB", "Collecting USB device history", "STARTED");
+
+    typeCommand("New-Item -ItemType Directory -Force -Path .\\usb", true);
+    delay(500);
+
+    // USB device registry keys
+    typeCommand("reg export 'HKLM\\SYSTEM\\CurrentControlSet\\Enum\\USBSTOR' .\\usb\\USBSTOR.reg /y", true);
+    delay(1500);
+    logAction("WIN_USB", "USBSTOR registry exported", "SUCCESS");
+
+    typeCommand("reg export 'HKLM\\SYSTEM\\CurrentControlSet\\Enum\\USB' .\\usb\\USB.reg /y", true);
+    delay(2000);
+    logAction("WIN_USB", "USB registry exported", "SUCCESS");
+
+    // Mounted devices
+    typeCommand("reg export 'HKLM\\SYSTEM\\MountedDevices' .\\usb\\MountedDevices.reg /y", true);
+    delay(1000);
+    logAction("WIN_USB", "MountedDevices exported", "SUCCESS");
+
+    // Get USB device information
+    typeCommand("Get-ItemProperty -Path 'HKLM:\\SYSTEM\\CurrentControlSet\\Enum\\USBSTOR\\*\\*' | Select-Object PSChildName, FriendlyName, Mfg | Export-Csv .\\usb\\usb_devices.csv -NoTypeInformation -ErrorAction SilentlyContinue", true);
+    delay(2000);
+
+    logAction("WIN_USB", "USB history collection complete", "SUCCESS");
+    return true;
+}
+
+bool HIDAutomation::executeWindowsPowerShellHistory() {
+    logAction("WIN_PSHISTORY", "Collecting PowerShell history", "STARTED");
+
+    typeCommand("New-Item -ItemType Directory -Force -Path .\\powershell", true);
+    delay(500);
+
+    // PSReadLine history
+    typeCommand("Copy-Item \"$env:APPDATA\\Microsoft\\Windows\\PowerShell\\PSReadLine\\ConsoleHost_history.txt\" .\\powershell\\ConsoleHost_history.txt -Force -ErrorAction SilentlyContinue", true);
+    delay(1000);
+    logAction("WIN_PSHISTORY", "PSReadLine history copied", "SUCCESS");
+
+    // PowerShell transcripts
+    typeCommand("Copy-Item \"$env:USERPROFILE\\Documents\\PowerShell_transcript.*\" .\\powershell\\ -Force -ErrorAction SilentlyContinue", true);
+    delay(1000);
+
+    // PowerShell event logs
+    typeCommand("Get-WinEvent -LogName 'Microsoft-Windows-PowerShell/Operational' -MaxEvents 1000 -ErrorAction SilentlyContinue | Select-Object TimeCreated, Id, Message | Export-Csv .\\powershell\\powershell_events.csv -NoTypeInformation", true);
+    delay(5000);
+    logAction("WIN_PSHISTORY", "PowerShell event logs collected", "SUCCESS");
+
+    logAction("WIN_PSHISTORY", "PowerShell history collection complete", "SUCCESS");
+    return true;
+}
+
 bool HIDAutomation::automateLinuxForensics() {
     logAction("LNX_AUTO_START", "Starting Linux forensics automation", "STARTED");
 
@@ -1078,6 +1241,153 @@ bool HIDAutomation::executeLinuxUserAccounts() {
     return true;
 }
 
+bool HIDAutomation::executeLinuxDocker() {
+    logAction("LNX_DOCKER", "Collecting Docker artifacts", "STARTED");
+
+    typeCommand("mkdir -p docker", true);
+    delay(300);
+
+    // Check if Docker is installed
+    typeCommand("if command -v docker &> /dev/null; then echo 'INSTALLED' > docker/docker_status.txt; else echo 'NOT_INSTALLED' > docker/docker_status.txt; fi", true);
+    delay(500);
+
+    // Docker version
+    typeCommand("docker --version > docker/docker_version.txt 2>&1", true);
+    delay(500);
+
+    // Running containers
+    typeCommand("docker ps -a --format '{{.ID}},{{.Image}},{{.Command}},{{.CreatedAt}},{{.Status}},{{.Names}}' > docker/containers.csv 2>&1", true);
+    delay(2000);
+    logAction("LNX_DOCKER", "Container list collected", "SUCCESS");
+
+    // Docker images
+    typeCommand("docker images --format '{{.Repository}},{{.Tag}},{{.ID}},{{.CreatedAt}},{{.Size}}' > docker/images.csv 2>&1", true);
+    delay(2000);
+    logAction("LNX_DOCKER", "Image list collected", "SUCCESS");
+
+    // Docker networks
+    typeCommand("docker network ls > docker/networks.txt 2>&1", true);
+    delay(1000);
+
+    // Docker volumes
+    typeCommand("docker volume ls > docker/volumes.txt 2>&1", true);
+    delay(1000);
+
+    // Inspect running containers (details)
+    typeCommand("for container in $(docker ps -q 2>/dev/null); do docker inspect $container > docker/inspect_$container.json 2>&1; done", true);
+    delay(5000);
+    logAction("LNX_DOCKER", "Container inspection complete", "SUCCESS");
+
+    logAction("LNX_DOCKER", "Docker collection complete", "SUCCESS");
+    return true;
+}
+
+bool HIDAutomation::executeLinuxSystemdJournal() {
+    logAction("LNX_JOURNAL", "Collecting systemd journal logs", "STARTED");
+
+    typeCommand("mkdir -p systemd_journal", true);
+    delay(300);
+
+    // Last 1000 journal entries
+    typeCommand("sudo journalctl -n 1000 --no-pager > systemd_journal/journal_last_1000.txt 2>&1", true);
+    delay(5000);
+    logAction("LNX_JOURNAL", "Recent journal entries collected", "SUCCESS");
+
+    // Boot logs
+    typeCommand("sudo journalctl -b --no-pager > systemd_journal/journal_current_boot.txt 2>&1", true);
+    delay(3000);
+    logAction("LNX_JOURNAL", "Current boot logs collected", "SUCCESS");
+
+    // Failed services
+    typeCommand("sudo journalctl -p err --no-pager > systemd_journal/journal_errors.txt 2>&1", true);
+    delay(2000);
+    logAction("LNX_JOURNAL", "Error logs collected", "SUCCESS");
+
+    // Authentication logs
+    typeCommand("sudo journalctl _COMM=sshd --no-pager > systemd_journal/journal_sshd.txt 2>&1", true);
+    delay(2000);
+
+    typeCommand("sudo journalctl _COMM=sudo --no-pager > systemd_journal/journal_sudo.txt 2>&1", true);
+    delay(2000);
+    logAction("LNX_JOURNAL", "Authentication logs collected", "SUCCESS");
+
+    logAction("LNX_JOURNAL", "Systemd journal collection complete", "SUCCESS");
+    return true;
+}
+
+bool HIDAutomation::executeLinuxFirewallRules() {
+    logAction("LNX_FIREWALL", "Collecting firewall rules", "STARTED");
+
+    typeCommand("mkdir -p firewall", true);
+    delay(300);
+
+    // iptables rules
+    typeCommand("sudo iptables -L -n -v > firewall/iptables_rules.txt 2>&1", true);
+    delay(1000);
+    logAction("LNX_FIREWALL", "iptables rules collected", "SUCCESS");
+
+    // iptables NAT rules
+    typeCommand("sudo iptables -t nat -L -n -v > firewall/iptables_nat.txt 2>&1", true);
+    delay(1000);
+
+    // ip6tables rules
+    typeCommand("sudo ip6tables -L -n -v > firewall/ip6tables_rules.txt 2>&1", true);
+    delay(1000);
+
+    // ufw status (if installed)
+    typeCommand("if command -v ufw &> /dev/null; then sudo ufw status verbose > firewall/ufw_status.txt 2>&1; fi", true);
+    delay(500);
+
+    // firewalld rules (if installed)
+    typeCommand("if command -v firewall-cmd &> /dev/null; then sudo firewall-cmd --list-all > firewall/firewalld_rules.txt 2>&1; fi", true);
+    delay(500);
+    logAction("LNX_FIREWALL", "Firewall rules collected", "SUCCESS");
+
+    logAction("LNX_FIREWALL", "Firewall collection complete", "SUCCESS");
+    return true;
+}
+
+bool HIDAutomation::executeLinuxCronJobs() {
+    logAction("LNX_CRON", "Collecting cron jobs", "STARTED");
+
+    typeCommand("mkdir -p cron_jobs", true);
+    delay(300);
+
+    // Current user crontab
+    typeCommand("crontab -l > cron_jobs/crontab_$(whoami).txt 2>&1", true);
+    delay(500);
+    logAction("LNX_CRON", "User crontab collected", "SUCCESS");
+
+    // System crontabs
+    typeCommand("sudo cat /etc/crontab > cron_jobs/etc_crontab.txt 2>/dev/null", true);
+    delay(300);
+
+    // Cron directories
+    typeCommand("sudo ls -laR /etc/cron.hourly > cron_jobs/cron_hourly.txt 2>&1", true);
+    delay(500);
+
+    typeCommand("sudo ls -laR /etc/cron.daily > cron_jobs/cron_daily.txt 2>&1", true);
+    delay(500);
+
+    typeCommand("sudo ls -laR /etc/cron.weekly > cron_jobs/cron_weekly.txt 2>&1", true);
+    delay(500);
+
+    typeCommand("sudo ls -laR /etc/cron.monthly > cron_jobs/cron_monthly.txt 2>&1", true);
+    delay(500);
+
+    // /var/spool/cron
+    typeCommand("sudo ls -la /var/spool/cron/crontabs/ > cron_jobs/spool_crontabs.txt 2>&1", true);
+    delay(500);
+
+    // All user crontabs
+    typeCommand("for user in $(cut -f1 -d: /etc/passwd); do echo \"User: $user\" >> cron_jobs/all_user_crontabs.txt; sudo crontab -u $user -l >> cron_jobs/all_user_crontabs.txt 2>&1; done", true);
+    delay(3000);
+    logAction("LNX_CRON", "All cron jobs collected", "SUCCESS");
+
+    logAction("LNX_CRON", "Cron collection complete", "SUCCESS");
+    return true;
+}
+
 bool HIDAutomation::automateMacOSForensics() {
     logAction("MAC_AUTO_START", "Starting macOS forensics automation", "STARTED");
 
@@ -1253,6 +1563,118 @@ bool HIDAutomation::executeMacOSBrowserHistory() {
     logAction("MAC_BROWSER", "Firefox history collected", "SUCCESS");
 
     logAction("MAC_BROWSER", "Browser history collection complete", "SUCCESS");
+    return true;
+}
+
+bool HIDAutomation::executeMacOSSpotlight() {
+    logAction("MAC_SPOTLIGHT", "Collecting Spotlight metadata", "STARTED");
+
+    typeCommand("mkdir -p spotlight", true);
+    delay(300);
+
+    // Spotlight database metadata
+    typeCommand("sudo ls -la /.Spotlight-V100 > spotlight/spotlight_metadata.txt 2>&1", true);
+    delay(1000);
+    logAction("MAC_SPOTLIGHT", "Spotlight metadata collected", "SUCCESS");
+
+    // Recent searches (if available)
+    typeCommand("if [ -f ~/Library/Application\\ Support/com.apple.spotlight/searches.db ]; then cp ~/Library/Application\\ Support/com.apple.spotlight/searches.db spotlight/searches.db; fi", true);
+    delay(1000);
+
+    // Metadata for user's home directory
+    typeCommand("mdfind -onlyin ~ 'kMDItemFSName == *' -count > spotlight/home_files_count.txt 2>&1", true);
+    delay(2000);
+
+    // Recent documents
+    typeCommand("mdfind -onlyin ~ 'kMDItemContentModificationDate >= $time.today(-7)' | head -1000 > spotlight/recent_documents.txt 2>&1", true);
+    delay(5000);
+    logAction("MAC_SPOTLIGHT", "Recent documents collected", "SUCCESS");
+
+    logAction("MAC_SPOTLIGHT", "Spotlight collection complete", "SUCCESS");
+    return true;
+}
+
+bool HIDAutomation::executeMacOSQuarantine() {
+    logAction("MAC_QUARANTINE", "Collecting quarantine and download history", "STARTED");
+
+    typeCommand("mkdir -p quarantine", true);
+    delay(300);
+
+    // Quarantine database (downloads with metadata)
+    typeCommand("if [ -f ~/Library/Preferences/com.apple.LaunchServices.QuarantineEventsV2 ]; then cp ~/Library/Preferences/com.apple.LaunchServices.QuarantineEventsV2 quarantine/QuarantineEventsV2.db; fi", true);
+    delay(1000);
+    logAction("MAC_QUARANTINE", "Quarantine database collected", "SUCCESS");
+
+    // List quarantined files
+    typeCommand("sqlite3 ~/Library/Preferences/com.apple.LaunchServices.QuarantineEventsV2 'SELECT * FROM LSQuarantineEvent' > quarantine/quarantine_events.txt 2>&1", true);
+    delay(2000);
+
+    // Extended attributes for quarantine (sample from Downloads)
+    typeCommand("xattr -l ~/Downloads/* > quarantine/downloads_xattr.txt 2>&1", true);
+    delay(2000);
+    logAction("MAC_QUARANTINE", "Extended attributes collected", "SUCCESS");
+
+    logAction("MAC_QUARANTINE", "Quarantine collection complete", "SUCCESS");
+    return true;
+}
+
+bool HIDAutomation::executeMacOSInstallHistory() {
+    logAction("MAC_INSTALL", "Collecting installation history", "STARTED");
+
+    typeCommand("mkdir -p install_history", true);
+    delay(300);
+
+    // System install history
+    typeCommand("sudo cp /Library/Receipts/InstallHistory.plist install_history/InstallHistory.plist 2>&1", true);
+    delay(1000);
+    logAction("MAC_INSTALL", "InstallHistory.plist copied", "SUCCESS");
+
+    // Convert plist to readable format
+    typeCommand("plutil -convert xml1 install_history/InstallHistory.plist -o install_history/InstallHistory.xml 2>&1", true);
+    delay(1000);
+
+    // Application installations from Receipts
+    typeCommand("sudo ls -la /Library/Receipts/ > install_history/receipts_list.txt 2>&1", true);
+    delay(500);
+
+    // Package manager info (Homebrew if installed)
+    typeCommand("if command -v brew &> /dev/null; then brew list --versions > install_history/homebrew_packages.txt 2>&1; fi", true);
+    delay(2000);
+
+    // MacPorts info (if installed)
+    typeCommand("if command -v port &> /dev/null; then port installed > install_history/macports_packages.txt 2>&1; fi", true);
+    delay(2000);
+    logAction("MAC_INSTALL", "Package manager info collected", "SUCCESS");
+
+    logAction("MAC_INSTALL", "Install history collection complete", "SUCCESS");
+    return true;
+}
+
+bool HIDAutomation::executeMacOSKeychain() {
+    logAction("MAC_KEYCHAIN", "Collecting keychain metadata (not passwords)", "STARTED");
+
+    typeCommand("mkdir -p keychain", true);
+    delay(300);
+
+    // List keychains
+    typeCommand("security list-keychains > keychain/keychains_list.txt 2>&1", true);
+    delay(500);
+    logAction("MAC_KEYCHAIN", "Keychain list collected", "SUCCESS");
+
+    // Keychain info (metadata only)
+    typeCommand("security dump-keychain -d ~/Library/Keychains/login.keychain-db > keychain/login_keychain_metadata.txt 2>&1", true);
+    delay(2000);
+
+    // List certificates
+    typeCommand("security find-certificate -a > keychain/certificates.txt 2>&1", true);
+    delay(1500);
+    logAction("MAC_KEYCHAIN", "Certificates listed", "SUCCESS");
+
+    // List identities
+    typeCommand("security find-identity -v > keychain/identities.txt 2>&1", true);
+    delay(1000);
+
+    logAction("MAC_KEYCHAIN", "Keychain metadata collection complete (passwords NOT extracted)", "SUCCESS");
     return true;
 }
 
