@@ -20,7 +20,7 @@ echo Done.
 echo.
 
 echo [4/5] Installing intelhex to PlatformIO Python...
-C:\Users\saint\.platformio\python3\python.exe -m pip install intelhex --upgrade
+C:\Users\user\.platformio\python3\python.exe -m pip install intelhex --upgrade
 echo Done.
 echo.
 
