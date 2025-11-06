@@ -4,27 +4,29 @@ echo FRFD PlatformIO Build Fix Script
 echo ========================================
 echo.
 
-echo [1/5] Cleaning PlatformIO cache...
+echo [1/6] Cleaning build directory...
+pio run -e lilygo-t-dongle-s3 -t clean
+echo Done.
+echo.
+
+echo [2/6] Cleaning PlatformIO cache...
 pio system prune -f
 echo Done.
 echo.
 
-echo [2/5] Uninstalling existing ESP32 platform...
+echo [3/6] Uninstalling existing ESP32 platform...
 pio platform uninstall espressif32
 echo Done.
 echo.
 
-echo [3/5] Installing ESP32 platform v6.4.0...
+echo [4/6] Installing ESP32 platform v6.4.0...
 pio platform install espressif32@6.4.0
 echo Done.
 echo.
 
-echo [4/5] Installing intelhex to PlatformIO Python...
-C:\Users\user\.platformio\python3\python.exe -m pip install intelhex --upgrade
-echo Done.
-echo.
 
-echo [5/5] Building firmware...
+
+echo [6/6] Building firmware...
 pio run -e lilygo-t-dongle-s3
 echo Done.
 echo.
