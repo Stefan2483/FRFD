@@ -73,7 +73,7 @@ pio platform install espressif32@6.4.0
 **Step 3: Install intelhex**
 ```bash
 # Windows
-C:\Users\saint\.platformio\python3\python.exe -m pip install intelhex
+%USERPROFILE%\.platformio\python3\python.exe -m pip install intelhex
 
 # Linux/Mac
 ~/.platformio/python3/bin/python -m pip install intelhex
@@ -112,18 +112,18 @@ pio run -e lilygo-t-dongle-s3
 ```bash
 # Find PlatformIO Python
 where python
-C:\Users\saint\.platformio\python3\python.exe --version
+%USERPROFILE%\.platformio\python3\python.exe --version
 ```
 
 **2. Manually install intelhex to correct Python**
 ```bash
 # Use the EXACT path from step 1
-C:\Users\saint\.platformio\python3\python.exe -m pip install intelhex --upgrade --force-reinstall
+%USERPROFILE%\.platformio\python3\python.exe -m pip install intelhex --upgrade --force-reinstall
 ```
 
 **3. Check if intelhex is installed**
 ```bash
-C:\Users\saint\.platformio\python3\python.exe -c "import intelhex; print('intelhex installed OK')"
+%USERPROFILE%\.platformio\python3\python.exe -c "import intelhex; print('intelhex installed OK')"
 ```
 
 **4. Clean build folder**

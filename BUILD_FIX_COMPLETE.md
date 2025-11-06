@@ -108,7 +108,7 @@ pio platform uninstall espressif32
 pio platform install espressif32@6.4.0
 
 # 3. Install intelhex
-C:\Users\saint\.platformio\python3\python.exe -m pip install intelhex
+%USERPROFILE%\.platformio\python3\python.exe -m pip install intelhex
 
 # 4. Build
 pio run -e lilygo-t-dongle-s3
@@ -169,7 +169,7 @@ Should show:
 
 ### 2. Verify intelhex is installed
 ```bash
-C:\Users\saint\.platformio\python3\python.exe -c "import intelhex; print('intelhex OK')"
+%USERPROFILE%\.platformio\python3\python.exe -c "import intelhex; print('intelhex OK')"
 ```
 
 Should output: `intelhex OK`
