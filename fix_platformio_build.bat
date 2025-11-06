@@ -24,10 +24,7 @@ pio platform install espressif32@6.4.0
 echo Done.
 echo.
 
-echo [5/6] Installing intelhex to PlatformIO Python...
-%USERPROFILE%\.platformio\python3\python.exe -m pip install intelhex --upgrade
-echo Done.
-echo.
+
 
 echo [6/6] Building firmware...
 pio run -e lilygo-t-dongle-s3
